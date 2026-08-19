@@ -96,8 +96,7 @@ email, a Route53 health check to SNS email, and DynamoDB point-in-time recovery.
 | No VPC | Nothing needs one, and a NAT Gateway alone is ~$32/mo — more than the entire system | VPC with private subnets |
 | Lambda over EC2/Fargate | Two busy evenings a year. A `t3.small` idles for 363 days | Always-on compute |
 | DynamoDB over RDS | Lambda + RDS means connection exhaustion, RDS Proxy, and therefore a VPC | RDS |
-| Conditional write over a queue | Booking must be synchronous. SQS standard is at-least-once and still races | SQS / SQS FIFO |
-| Streams over SQS for email | Same decoupling, one less service to maintain | SQS |
+| No SQS anywhere | Booking must be synchronous, and SQS standard is at-least-once and still races. For email, DynamoDB Streams give the same decoupling with one less service to maintain | SQS / SQS FIFO |
 | Staff-only accounts | ~1000 parent accounts means bulk import and password resets with no IT staff | Parent accounts |
 | Glacier IR over Glacier Flexible | Flexible needs a restore job. A parent clicking last year's concert photo would get nothing for hours | Glacier Flexible / Deep Archive |
 | No CI/CD | The teacher will never push to git | GitHub Actions |

@@ -1,8 +1,9 @@
 # CLAUDE.md
 
 Topic rules live in `.claude/rules/` and load automatically: `testing.md` and
-`debugging.md` every session, `terraform.md` only when a `.tf` or `.tfvars`
-file is opened.
+`debugging.md` every session; `terraform.md` when a `.tf` or `.tfvars` file is
+opened; `data-model.md` when working in `03-data/`, `04-booking/`,
+`05-waitlist/`, or `modules/booking/`.
 
 ## Quality Checklist
 
@@ -16,6 +17,8 @@ reporting completion. Show actual test output as proof — never "this should wo
    (see `.claude/rules/debugging.md`)
 3. Handler env vars MUST be wired in IaC + asserted in a test.
    (see `.claude/rules/terraform.md`)
+4. NEVER create, modify, or destroy real AWS resources without asking first.
+   Nothing in this repo is free to leave running. (see `.claude/rules/terraform.md`)
 
 ## General Behaviour
 
@@ -29,24 +32,54 @@ mode unless the question requires it.
 
 ## Project Overview
 
-A school website built on AWS with Terraform. The build is split into six
-standalone episode stages, `01-storage` through `06-cost`, each with its own
-Terraform root and state. `modules/` holds the reusable modules the stages
-consume.
+A school website for a fictional-but-realistic school, built on AWS with
+Terraform and filmed as a YouTube series. The repo is the primary artifact — a
+portfolio piece. The front end is a prop: keep it minimal. The infrastructure
+and the reasoning behind it are the product.
 
-Current state: scaffold only. Every directory contains a placeholder README and
-nothing else — there are no `.tf` files, no application code, no test runner,
-and no CI in the repo yet.
+Six episode stages, `01-storage` through `06-cost`. They are **cumulative, not
+independent**: each stage deploys the whole stack up to that point by calling
+modules from `modules/`, so `cd 04-booking && terraform apply` works without
+running 01–03 first. `06-cost` is the complete system.
+
+Because every stage creates the same globally-unique names (S3 buckets, Cognito
+pool, Route53 records), only ONE stage may be applied at a time. Apply, verify,
+destroy, then move to the next. Each stage also needs its own backend key or
+they will fight over state.
+
+Region is `ca-central-1` — data must stay in Canada. Not negotiable.
+
+Current state: scaffold only. Every directory holds a placeholder README and
+nothing else — no `.tf` files, no application code, no test runner, no CI.
 
 ## Business Model
 
-TODO — not yet documented. Needs: who the site serves (students, parents,
-staff), and what the booking and waitlist flows are actually for.
+Serves 800 students, 60 staff, and their parents. One teacher maintains it;
+there is no IT staff.
+
+- **Public, read-only:** school info, published timetable
+- **Public, write (throttled):** a parent books a parent-teacher interview slot,
+  gated by an existing student number — no account required
+- **Staff only (Cognito):** publish the timetable, open interview windows, view
+  rosters, upload media
+
+Parents do NOT schedule courses — scheduling is staff work. Parents book
+interview slots and club/activity spots.
+
+**Constraints that drive every decision:**
+
+- Budget under $20/month; target under $10
+- ~40GB of photos and event video, growing ~15GB/year, rarely read after the
+  first month
+- Near-dead traffic most of the year, spiking to ~300 parents in one evening,
+  twice a year
+- Cannot lose a booking. Can lose analytics.
+- No VPC anywhere — a NAT Gateway alone is ~$32/mo, more than the whole system
 
 ## Repository Structure
 
 ```
-01-storage/ .. 06-cost/   standalone episode stages, one Terraform root each
+01-storage/ .. 06-cost/   cumulative episode stages; 06-cost is the full stack
 modules/static-site/      reusable static site infrastructure
 modules/auth/             reusable staff authentication infrastructure
 modules/booking/          reusable booking and waitlist infrastructure
@@ -55,8 +88,9 @@ MISTAKES.md               running log of errors, surprises, and decisions
 
 ## Build Commands
 
-Each stage is its own Terraform root, so run commands from inside the stage
-directory, not the repo root:
+Each stage is its own Terraform root with its own backend key, so run commands
+from inside the stage directory, not the repo root. Only one stage may be
+applied at a time — they collide on globally-unique names.
 
 ```
 cd 01-storage
@@ -72,10 +106,25 @@ that is never committed.
 
 ## Tech Stack
 
-- **IaC:** Terraform
-- **Cloud:** AWS
-- **AWS services:** TODO — not yet chosen or committed to code. Do not assume
-  services from the episode directory names; confirm before building on them.
+- **IaC:** Terraform in `ca-central-1`. Pin `required_version` and provider
+  versions in every stage so old episodes stay reproducible.
+- **Site + media:** S3 + CloudFront with OAC, Route53 for DNS. Versioning on.
+  Media lifecycle Standard → Standard-IA at 30d → Glacier IR at 90d. Uploads go
+  direct to S3 via presigned URLs, never through Lambda.
+- **Auth:** Cognito user pool with hosted UI, staff only (~60 accounts),
+  `allow_admin_create_user_only = true`. No parent or student accounts.
+- **API + compute:** API Gateway HTTP API → Lambda → DynamoDB on-demand. Public
+  routes throttled (low burst + rate limit) with student-number format
+  validation.
+- **Async:** DynamoDB Streams → Lambda → SES for confirmations and waitlist
+  promotion. No SQS.
+- **Guardrails** (this is the entire monitoring story): AWS Budgets alarm →
+  email, Route53 health check → SNS email, DynamoDB point-in-time recovery. No
+  dashboards, no paging alarms.
+
+Deliberately out of scope: CI/CD, dashboards, paging alarms, multi-region, RDS,
+containers, Kubernetes, VPC, waitlist claim expiry, parent accounts, payments,
+grades. Each cut is stated on camera with its reason — the cuts are the content.
 
 ## Key Files
 

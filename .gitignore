@@ -2,3 +2,6 @@
 *.tfstate
 *.tfstate.*
 *.tfvars
+
+# Private build log - names account IDs, profiles, and unrelated workloads
+MISTAKES.md

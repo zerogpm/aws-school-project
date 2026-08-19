@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --color-forest-50: #f2f7f3;
+  --color-forest-100: #dfeae1;
+  --color-forest-600: #2f6b46;
+  --color-forest-700: #235437;
+  --color-forest-900: #12291c;
+
+  --color-ink: #16211b;
+  --color-muted: #5b6b62;
+  --color-paper: #fbfaf7;
+  --color-line: #e3e0d8;
+  --color-brass: #b08327;
+
+  --font-serif: "Source Serif 4", Georgia, serif;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+}

@@ -1,7 +1,10 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { NAV } from "./data";
+import { useAuth } from "./auth/authState";
 
 export default function App() {
+  const { session, loading } = useAuth();
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 border-b border-line bg-paper/85 backdrop-blur">
@@ -31,12 +34,25 @@ export default function App() {
                 {item.label}
               </NavLink>
             ))}
-            <NavLink
-              to="/staff"
-              className="rounded-md border border-line px-3 py-1.5 text-ink hover:border-forest-600"
-            >
-              Staff sign in
-            </NavLink>
+            {/* Rendered as a transparent placeholder while the stored session
+                is still being read, so the header does not jump a button width
+                once it resolves - and so a signed-in teacher never sees "Staff
+                sign in" flash before it corrects itself. */}
+            {loading ? (
+              <span
+                aria-hidden
+                className="rounded-md border border-transparent px-3 py-1.5 text-transparent"
+              >
+                Staff sign in
+              </span>
+            ) : (
+              <NavLink
+                to={session ? "/admin" : "/staff"}
+                className="rounded-md border border-line px-3 py-1.5 text-ink hover:border-forest-600"
+              >
+                {session ? "Staff admin" : "Staff sign in"}
+              </NavLink>
+            )}
           </nav>
         </div>
       </header>

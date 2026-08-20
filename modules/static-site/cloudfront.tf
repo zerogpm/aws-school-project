@@ -25,6 +25,10 @@ resource "aws_cloudfront_distribution" "this" {
   default_root_object = "index.html"
   price_class         = var.cloudfront_price_class
 
+  # The names this distribution will answer to. Empty without a custom domain,
+  # which leaves it reachable only at its own *.cloudfront.net name.
+  aliases = local.custom_domain ? [var.domain_name] : []
+
   origin {
     origin_id                = "site"
     domain_name              = aws_s3_bucket.site.bucket_regional_domain_name
@@ -99,10 +103,22 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
-  # No custom domain yet - this uses the *.cloudfront.net certificate. A school
-  # domain means an ACM cert in us-east-1, which is a separate decision.
+  # Two mutually exclusive shapes in one block: the free *.cloudfront.net
+  # certificate, or the ACM one. A null argument is omitted entirely, which is
+  # what lets a single block cover both - CloudFront rejects a request that
+  # sets the default certificate flag and an ACM ARN together.
+  #
+  # The ARN comes from the validation resource rather than the certificate, so
+  # the distribution cannot be updated until ACM has actually issued it.
   viewer_certificate {
-    cloudfront_default_certificate = true
+    cloudfront_default_certificate = local.custom_domain ? null : true
+
+    acm_certificate_arn = local.custom_domain ? aws_acm_certificate_validation.this[0].certificate_arn : null
+    ssl_support_method  = local.custom_domain ? "sni-only" : null
+
+    # Only applies with a custom certificate. sni-only plus TLS 1.2 is the
+    # cheap combination: a dedicated IP costs $600/month.
+    minimum_protocol_version = local.custom_domain ? "TLSv1.2_2021" : null
   }
 
   # No access logging. It is a second bucket accumulating charges to answer

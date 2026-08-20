@@ -17,8 +17,21 @@ output "media_bucket_arn" {
 }
 
 output "cloudfront_domain_name" {
-  description = "Public URL of the site until a custom domain is attached."
+  description = "The distribution's own name. Still reachable when a custom domain is attached - CloudFront does not stop answering to it."
   value       = aws_cloudfront_distribution.this.domain_name
+}
+
+output "site_url" {
+  description = "Canonical URL of the site. The custom domain when there is one, the distribution name otherwise. Callers should build redirect and callback URLs from this rather than from cloudfront_domain_name, which changes whenever the distribution is recreated."
+  value       = local.custom_domain ? "https://${var.domain_name}" : "https://${aws_cloudfront_distribution.this.domain_name}"
+}
+
+output "site_origins" {
+  description = "Every origin the browser may load the site from. Both names when a custom domain is attached, because the distribution answers to both."
+  value = local.custom_domain ? [
+    "https://${var.domain_name}",
+    "https://${aws_cloudfront_distribution.this.domain_name}",
+  ] : ["https://${aws_cloudfront_distribution.this.domain_name}"]
 }
 
 output "cloudfront_distribution_id" {

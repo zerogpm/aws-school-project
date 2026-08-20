@@ -19,6 +19,11 @@ reporting completion. Show actual test output as proof — never "this should wo
    (see `.claude/rules/terraform.md`)
 4. NEVER create, modify, or destroy real AWS resources without asking first.
    Nothing in this repo is free to leave running. (see `.claude/rules/terraform.md`)
+5. NEVER run `git commit`, `git push`, `git merge`, `git rebase`, or anything
+   else that writes to history or a remote. Staging and committing are the
+   maintainer's job alone. The commit log is part of the series narrative — each
+   commit marks an episode beat — so it is authored deliberately, not generated
+   as a side effect of a change. Read-only git (`status`, `diff`, `log`) is fine.
 
 ## General Behaviour
 

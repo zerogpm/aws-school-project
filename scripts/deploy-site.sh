@@ -14,7 +14,30 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUCKET="${SITE_BUCKET:-$(terraform -chdir="$ROOT/$STAGE" output -raw site_bucket_name)}"
 DIST="${DISTRIBUTION_ID:-$(terraform -chdir="$ROOT/$STAGE" output -raw cloudfront_distribution_id)}"
 
+# The bundle is built against one specific user pool, so the pool identifiers
+# have to be known before npm run build.
+#
+# Only resolved here for a manual run, detected by SITE_BUCKET being unset.
+# Under terraform apply these already arrive in the environment, and calling
+# terraform output mid-apply would block forever on the state lock that the
+# apply is already holding.
+#
+# A stage with no user pool - 01-storage - leaves both empty. The Staff page
+# checks for that and says so rather than rendering a sign-in form that cannot
+# work.
+if [ -z "${SITE_BUCKET:-}" ]; then
+  client="$(terraform -chdir="$ROOT/$STAGE" output -raw user_pool_client_id 2>/dev/null || true)"
+  if [ -n "$client" ]; then
+    export VITE_COGNITO_CLIENT_ID="$client"
+  fi
+  region="$(terraform -chdir="$ROOT/$STAGE" output -raw aws_region 2>/dev/null || true)"
+  if [ -n "$region" ]; then
+    export VITE_COGNITO_REGION="$region"
+  fi
+fi
+
 echo "==> building"
+echo "    user pool: ${VITE_COGNITO_CLIENT_ID:-none configured}"
 (cd "$ROOT/site" && npm run build)
 
 # Filenames under assets/ carry a content hash, so a changed file is a changed

@@ -4,7 +4,10 @@
     "target": "es2023",
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
-    "types": ["vite/client"],
+    /* node is here for the *.test.ts files beside the source, which read
+       repo files to assert build wiring. Application code that imports a node
+       builtin still fails at the vite build, where it should. */
+    "types": ["vite/client", "node"],
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 

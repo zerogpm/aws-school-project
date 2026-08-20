@@ -8,6 +8,43 @@ variable "bucket_suffix" {
   type        = string
 }
 
+variable "domain_name" {
+  description = <<-EOT
+    Custom domain for the site, e.g. "school.chrissu.online".
+
+    Empty means no custom domain: the distribution keeps its *.cloudfront.net
+    name and its default certificate, and no Route53 or ACM resources are
+    created at all. That is what 01-storage used before the domain existed, and
+    it stays the default so the module works in an account with no hosted zone.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "hosted_zone_name" {
+  description = <<-EOT
+    Route53 zone that owns domain_name, e.g. "chrissu.online". Required when
+    domain_name is set.
+
+    Named rather than derived from domain_name: a subdomain can be several
+    labels deep, and there is no way to tell from the name alone where the
+    zone boundary falls. Using a subdomain of an existing zone also avoids a
+    second hosted zone at $0.50/month.
+  EOT
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.domain_name == "" || var.hosted_zone_name != ""
+    error_message = "hosted_zone_name is required when domain_name is set - the records have to be written into some zone."
+  }
+
+  validation {
+    condition     = var.domain_name == "" || endswith(var.domain_name, var.hosted_zone_name)
+    error_message = "domain_name must sit inside hosted_zone_name, e.g. school.chrissu.online inside chrissu.online."
+  }
+}
+
 variable "media_ia_transition_days" {
   description = "Days before media moves to Standard-IA."
   type        = number

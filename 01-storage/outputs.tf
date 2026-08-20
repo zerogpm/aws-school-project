@@ -9,8 +9,8 @@ output "media_bucket_name" {
 }
 
 output "site_url" {
-  description = "Public URL until a custom domain is attached."
-  value       = "https://${module.static_site.cloudfront_domain_name}"
+  description = "Canonical public URL of the site - the custom domain when one is configured."
+  value       = module.static_site.site_url
 }
 
 output "cloudfront_distribution_id" {

@@ -23,7 +23,7 @@ provider "aws" {
   default_tags {
     tags = {
       Project   = var.project_name
-      Stage     = "01-storage"
+      Stage     = "02-auth"
       ManagedBy = "terraform"
     }
   }
@@ -43,7 +43,7 @@ provider "aws" {
   default_tags {
     tags = {
       Project   = var.project_name
-      Stage     = "01-storage"
+      Stage     = "02-auth"
       ManagedBy = "terraform"
     }
   }

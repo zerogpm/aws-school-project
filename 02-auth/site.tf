@@ -46,6 +46,12 @@ resource "terraform_data" "site_content" {
   triggers_replace = {
     site_hash = local.site_hash
     bucket    = module.static_site.site_bucket_name
+
+    # The pool identifiers are compiled into the bundle, so a destroyed and
+    # recreated pool has to force a rebuild. Without this the site keeps a
+    # client id that no longer exists and every sign-in fails with an opaque
+    # hosted UI error.
+    client_id = module.auth.user_pool_client_id
   }
 
   provisioner "local-exec" {
@@ -55,6 +61,14 @@ resource "terraform_data" "site_content" {
     environment = {
       SITE_BUCKET     = module.static_site.site_bucket_name
       DISTRIBUTION_ID = module.static_site.cloudfront_distribution_id
+
+      # Read by src/auth/config.ts. Public values, not secrets: the app client
+      # generates no secret, because anything inside a bundle is readable.
+      #
+      # No hosted UI domain here - the sign-in form is ours and talks to the
+      # regional cognito-idp endpoint directly, which needs no domain at all.
+      VITE_COGNITO_CLIENT_ID = module.auth.user_pool_client_id
+      VITE_COGNITO_REGION    = var.aws_region
     }
   }
 }

@@ -2,11 +2,15 @@
 aws_region   = "ca-central-1"
 project_name = "school"
 
+# Uncomment to let a locally served front end complete a hosted UI sign-in.
+# Adds http://localhost:5173/staff as a callback URL on the app client.
+# dev_origins = ["http://localhost:5173"]
+
 # Custom domain. Leave both unset to keep the *.cloudfront.net name and create
 # no Route53 or ACM resources at all.
 #
 # A subdomain of a zone you already own costs nothing extra - a new hosted zone
 # is $0.50/month. The certificate is free, and lives in us-east-1 because
 # CloudFront accepts one from nowhere else.
-# domain_name      = "school.chrissu.online"
-# hosted_zone_name = "chrissu.online"
+# domain_name      = "xxxx.xxxx.xxxx"
+# hosted_zone_name = "xxxxx.xxxxx"

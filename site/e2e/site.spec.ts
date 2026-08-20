@@ -110,13 +110,13 @@ test.describe("interview booking", () => {
 });
 
 test.describe("staff", () => {
-  test("staff sign in is present but not yet wired to Cognito", async ({ page }) => {
+  // The flow itself lives in staff.spec.ts. This only guards the way in.
+  test("staff sign in is reachable from the header on every page", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: /staff sign in/i }).click();
 
     await expect(page).toHaveURL(/\/staff$/);
-    await expect(
-      page.getByRole("button", { name: /sign in with cognito/i }),
-    ).toBeDisabled();
+    await expect(page.getByLabel(/school email/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /^sign in$/i })).toBeEnabled();
   });
 });

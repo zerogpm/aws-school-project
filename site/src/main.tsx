@@ -6,6 +6,9 @@ import Home from "./routes/Home";
 import Timetable from "./routes/Timetable";
 import Interviews from "./routes/Interviews";
 import Staff from "./routes/Staff";
+import Admin from "./routes/Admin";
+import { AuthProvider } from "./auth/AuthContext";
+import ProtectedRoute from "./auth/ProtectedRoute";
 import NotFound from "./routes/NotFound";
 import "./index.css";
 
@@ -15,15 +18,25 @@ createRoot(document.getElementById("root")!).render(
         index.html for any unmatched key, which modules/static-site configures
         as a 403/404 -> /index.html rewrite with a 200 status. */}
     <BrowserRouter>
-      <Routes>
-        <Route element={<App />}>
-          <Route index element={<Home />} />
-          <Route path="timetable" element={<Timetable />} />
-          <Route path="interviews" element={<Interviews />} />
-          <Route path="staff" element={<Staff />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route element={<App />}>
+            <Route index element={<Home />} />
+            <Route path="timetable" element={<Timetable />} />
+            <Route path="interviews" element={<Interviews />} />
+            <Route path="staff" element={<Staff />} />
+            <Route
+              path="admin"
+              element={
+                <ProtectedRoute>
+                  <Admin />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 );

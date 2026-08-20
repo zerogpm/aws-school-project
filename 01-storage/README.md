@@ -65,12 +65,17 @@ terraform plan
 terraform apply
 
 terraform destroy
+../scripts/check-destroyed.sh
 ```
 
 Buckets are versioned with `force_destroy = true`, so `terraform destroy`
 purges every object version and delete marker for you. That suits a repo whose
 whole workflow is apply, verify, destroy — but it is the wrong default for real
 data, and `force_destroy = false` is a supported variable.
+
+`check-destroyed.sh` is the confirmation step: it sweeps the account by name and
+exits non-zero if a bucket or distribution is still standing, because a destroy
+that failed part way says so in output that scrolls past.
 
 ## Video
 

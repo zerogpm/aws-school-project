@@ -27,6 +27,32 @@ variable "deploy_site" {
   default     = true
 }
 
+variable "dev_origins" {
+  description = <<-EOT
+    Extra origins allowed to complete a hosted UI sign-in, for running the front
+    end locally - e.g. ["http://localhost:5173"]. Each becomes a callback URL of
+    <origin>/staff and a logout URL of <origin>.
+
+    Empty by default: a deployed client should only redirect to the deployed
+    site. Uncomment it while working on the sign-in flow, and take it back out.
+  EOT
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for origin in var.dev_origins :
+      startswith(origin, "https://") || startswith(origin, "http://localhost")
+    ])
+    error_message = "Cognito only accepts a plain http callback for localhost. Anything else must be https."
+  }
+
+  validation {
+    condition     = alltrue([for origin in var.dev_origins : !endswith(origin, "/")])
+    error_message = "Drop the trailing slash - these are concatenated with /staff, and Cognito matches redirect URLs literally."
+  }
+}
+
 variable "domain_name" {
   description = "Custom domain for the site, e.g. \"school.chrissu.online\". Empty keeps the *.cloudfront.net name and creates no Route53 or ACM resources."
   type        = string

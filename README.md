@@ -53,6 +53,81 @@ data.
 
 ---
 
+## Running it locally, without AWS
+
+The front end runs entirely on your machine. No AWS account, no credentials, no
+`terraform apply`:
+
+```
+cd site
+npm install
+npm run dev        # http://localhost:5173
+```
+
+Every public page works. The home page, the published timetable, and the
+interview booking form — which validates student numbers and refuses a full slot
+— all run against fixture data in `src/data.ts`. There is no API behind the form
+yet, so submitting says so rather than pretending.
+
+Both test suites run with no AWS environment at all:
+
+```
+npm test           # unit - Vitest + React Testing Library
+npm run test:e2e   # e2e - Playwright, against the real production build
+npm run build      # production build into dist/
+npm run lint
+```
+
+The e2e suite walks the entire staff sign-in journey — a wrong password, the
+forced password change every new account hits, session renewal from a refresh
+token, sign-out — with every call to Cognito intercepted inside the spec. No
+test has ever reached AWS, and none needs to.
+
+**The one thing that does not work offline is signing in.** It needs a real
+Cognito user pool and there is no offline substitute. A build with no pool
+configured detects that, disables the sign-in button and explains itself rather
+than failing with an opaque network error. Nothing else on the site is affected.
+
+To sign in against a real pool while still running the front end locally, apply
+`02-auth`, then write its details into `site/.env.local`:
+
+```
+cd 02-auth
+cat > ../site/.env.local <<EOF
+VITE_COGNITO_CLIENT_ID=$(terraform output -raw user_pool_client_id)
+VITE_COGNITO_REGION=$(terraform output -raw aws_region)
+EOF
+```
+
+Neither value is a secret — the app client generates none, because anything
+inside a JavaScript bundle is readable. They are account-specific and go stale
+on the next destroy, so `.env*.local` is gitignored.
+
+Playwright deliberately runs against `vite preview`, not the dev server: the SPA
+fallback and the hashed asset names only exist after a build, and those are
+exactly the things worth testing.
+
+### The database, locally
+
+DynamoDB runs in Docker, so handler work needs no AWS account either:
+
+```
+./app.sh --start           database and tables
+./app.sh --start --web     also launch the front end
+./app.sh --status          containers, ports, tables
+./app.sh --stop            stop everything, keep the data
+./app.sh --stop --wipe     stop everything and delete the database
+```
+
+One environment variable decides where a handler points: `DYNAMODB_ENDPOINT` is
+set only locally, so deployed Lambdas run the same code against real AWS with no
+`isLocal` branch anywhere. See [`backend/README.md`](backend/README.md) for the
+setup and its gotchas — `localhost` versus `127.0.0.1`, why a healthy container
+answers HTTP 400, and why the local schema is a hand-written mirror you have to
+keep in step with the Terraform yourself.
+
+---
+
 ## The constraints that drive every decision
 
 - 800 students, 60 staff, plus parents
@@ -75,8 +150,10 @@ Buckets are fully private. Versioning on. Media lifecycle Standard →
 Standard-IA at 30d → Glacier IR at 90d. Uploads go direct to S3 via presigned
 URLs, never through Lambda.
 
-**Auth** — Cognito user pool with hosted UI, staff only (~60 accounts),
-self-signup disabled. No parent or student accounts.
+**Auth** — Cognito user pool, staff only (~60 accounts), self-signup disabled.
+No parent or student accounts. The sign-in form is the school's own page talking
+to `cognito-idp` directly, not the Cognito hosted UI — the hosted UI can be
+recoloured but never restyled past a centered card, and the site has a design.
 
 **API + compute** — API Gateway HTTP API → Lambda → DynamoDB on-demand. Public
 routes throttled, with student-number format validation.
@@ -111,8 +188,8 @@ decision forces the next.
 | Stage | Adds | Status |
 | --- | --- | --- |
 | [`01-storage`](01-storage/) | Private S3 site + media buckets, CloudFront with OAC, lifecycle to Glacier IR | Built |
-| [`02-auth`](02-auth/) | Cognito user pool, hosted UI, staff-only accounts | Not started |
-| [`03-data`](03-data/) | Single-table DynamoDB design, API Gateway, Lambda | Not started |
+| [`02-auth`](02-auth/) | Cognito user pool, staff-only accounts, custom sign-in form, custom domain | Built |
+| [`03-data`](03-data/) | Single-table DynamoDB design, API Gateway, Lambda — and one copy of the handler code that also runs locally under Express | Built, not yet applied |
 | [`04-booking`](04-booking/) | Conditional writes, the double-booking demo | Not started |
 | [`05-waitlist`](05-waitlist/) | Atomic counters, Streams → SES promotion | Not started |
 | [`06-cost`](06-cost/) | Budgets alarm, health check, PITR — **and the complete system** | Not started |
@@ -125,7 +202,11 @@ modules/auth/             Cognito
 modules/booking/          DynamoDB, Lambda, API Gateway
 01-storage/ .. 06-cost/   episode stages; each calls the modules it needs
 site/                     React SPA (Vite), plus its unit and e2e tests
+backend/                  Lambda handlers, plus the local DynamoDB harness
 scripts/deploy-site.sh    build the front end and publish it
+scripts/create-staff.sh   create a staff account and put it in a group
+scripts/check-destroyed.sh  confirm a destroy really left nothing behind
+app.sh                    the local stack: --start [--api] [--web], --stop, --status, --scan
 ```
 
 Stages hold only module calls and variables. The infrastructure itself lives in
@@ -156,17 +237,6 @@ That builds, uploads, and invalidates the CloudFront cache, with two cache
 policies: files under `assets/` carry a content hash in the filename and are
 marked immutable for a year, while `index.html` is `must-revalidate` so a deploy
 is visible immediately.
-
-```
-cd site
-npm run dev        # local dev server
-npm test           # unit - Vitest + React Testing Library
-npm run test:e2e   # e2e - Playwright, against the real production build
-npm run build      # production build into dist/
-```
-
-Playwright deliberately runs against `vite preview` rather than the dev server,
-because the SPA fallback and the hashed asset names only exist after a build.
 
 An empty bucket returns **403, not 404** — the bucket policy grants `GetObject`
 but not `ListBucket`, so S3 cannot distinguish a missing key from a forbidden

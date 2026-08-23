@@ -1,0 +1,33 @@
+# DynamoDB Local. One compose file - Docker is cross-platform, and nothing here
+# needs a per-OS variant.
+
+# Pinned, not derived. Compose names the project after the directory it finds
+# this file in - "local" - and any other project with a backend/local/ produces
+# the same name, the same volume, and therefore the same database. Two projects
+# on one laptop then share their tables, and `down -v` in either one silently
+# destroys the other's data.
+name: school-local
+
+services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: school-dynamodb
+    ports:
+      # 8000 on both sides. Bind to 127.0.0.1 explicitly rather than 0.0.0.0 so
+      # a laptop on school wifi is not serving an unauthenticated database to
+      # the network.
+      - "127.0.0.1:8000:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /data"
+
+    # The image's default user cannot write to a mounted volume. This is the
+    # actual fix for the volume-permission errors on Windows, macOS and Linux
+    # alike - and the reason no platform-specific compose file is needed.
+    user: root
+
+    volumes:
+      # -dbPath plus a named volume is what makes this persistent. Without both
+      # it runs in memory and every restart is a fresh empty database.
+      - dynamodb-data:/data
+
+volumes:
+  dynamodb-data:

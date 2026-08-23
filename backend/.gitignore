@@ -1,0 +1,6 @@
+node_modules
+dist
+*.tsbuildinfo
+
+# DynamoDB Local writes here if it is ever run outside the container
+.dynamodb

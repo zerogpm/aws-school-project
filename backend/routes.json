@@ -1,0 +1,27 @@
+[
+  {
+    "name": "health",
+    "method": "GET",
+    "path": "/health",
+    "entry": "src/handlers/health.ts",
+    "auth": "public",
+    "access": "none",
+    "env": [
+      "ALLOWED_ORIGINS"
+    ],
+    "timeout": 5
+  },
+  {
+    "name": "list-windows",
+    "method": "GET",
+    "path": "/windows",
+    "entry": "src/handlers/windows/list-windows.ts",
+    "auth": "staff",
+    "access": "read",
+    "env": [
+      "ALLOWED_ORIGINS",
+      "TABLE_NAME"
+    ],
+    "timeout": 10
+  }
+]

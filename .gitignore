@@ -5,3 +5,10 @@
 
 # Private build log - names account IDs, profiles, and unrelated workloads
 MISTAKES.md
+
+# Local front-end config: account-specific, and stale after a destroy
+.env*.local
+
+# Detached server output from ./app.sh --start --api --web
+.local-api.log
+.local-web.log

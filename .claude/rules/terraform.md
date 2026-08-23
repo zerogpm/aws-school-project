@@ -15,7 +15,16 @@ not copy resource blocks between stages.
 
 **Env vars (blocker):** every Lambda handler env var must be declared in the
 Terraform that creates the function AND asserted in a test. A handler reading a
-var that no `.tf` file sets is a defect even if the code looks correct.
+var that no `.tf` file sets is a defect even if the code looks correct — and it
+is invisible locally, where every handler shares one process and sees every
+variable.
+
+**Lambda routes come from the manifest, not from here.** `modules/booking/`
+reads `backend/routes.json` and creates one function, log group, role and route
+per entry. Do not hand-write a `aws_lambda_function` or `aws_apigatewayv2_route`
+block for a new endpoint — add it to `backend/src/routes.ts` and run
+`npm run routes:emit`. A handler must work in both runtimes before it is done;
+see `.claude/rules/handlers.md`.
 
 **Secrets:** never in committed `.tf` files. Use `terraform.tfvars` (gitignored)
 or Parameter Store.

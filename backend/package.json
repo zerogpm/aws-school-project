@@ -1,0 +1,37 @@
+{
+  "name": "backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "db:up": "docker compose -f local/docker-compose.yml up -d",
+    "db:down": "docker compose -f local/docker-compose.yml down",
+    "db:wipe": "docker compose -f local/docker-compose.yml down -v",
+    "db:tables": "tsx local/create-tables.ts",
+    "db:admin": "cross-env-shell dynamodb-admin --port 8001",
+    "start": "tsx local/server.ts",
+    "dev": "tsx watch local/server.ts",
+    "routes:emit": "tsx scripts/emit-routes.ts",
+    "build:handlers": "tsx scripts/build-handlers.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.712.0",
+    "@aws-sdk/lib-dynamodb": "^3.712.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.152",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.13.3",
+    "@types/supertest": "^6.0.3",
+    "esbuild": "^0.25.10",
+    "supertest": "^7.1.4",
+    "tsx": "^4.19.2",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.11"
+  }
+}

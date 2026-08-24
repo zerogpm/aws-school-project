@@ -105,6 +105,15 @@ export function json(event: ApiEvent, statusCode: number, payload: unknown): Api
 
 export const ok = (event: ApiEvent, payload: unknown): ApiResult => json(event, 200, payload);
 
+/**
+ * 201, for a booking that was actually created.
+ *
+ * Distinct from ok() because the booking routes are the first thing here that
+ * creates a resource, and a parent's client needs to tell "your slot is
+ * confirmed" from "here is the list you asked for".
+ */
+export const created = (event: ApiEvent, payload: unknown): ApiResult => json(event, 201, payload);
+
 export const badRequest = (event: ApiEvent, error: string): ApiResult =>
   json(event, 400, { error });
 
@@ -113,6 +122,22 @@ export const unauthorized = (event: ApiEvent, error = "Unauthorized"): ApiResult
 
 export const forbidden = (event: ApiEvent, error = "Forbidden"): ApiResult =>
   json(event, 403, { error });
+
+export const notFound = (event: ApiEvent, error = "Not found"): ApiResult =>
+  json(event, 404, { error });
+
+/**
+ * 409, and the reason this episode exists.
+ *
+ * A booking loses a race - the slot went while the page was open, or this
+ * family already holds a slot with this teacher. Both are the caller's problem
+ * to resolve rather than a server fault, and the message says which, because a
+ * parent cannot act on "conflict".
+ *
+ * Distinct from badRequest: the request was well-formed and would have
+ * succeeded a moment earlier.
+ */
+export const conflict = (event: ApiEvent, error: string): ApiResult => json(event, 409, { error });
 
 /**
  * Deliberately says nothing. The detail belongs in the log, where CloudWatch

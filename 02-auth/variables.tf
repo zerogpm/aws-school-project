@@ -54,13 +54,13 @@ variable "dev_origins" {
 }
 
 variable "domain_name" {
-  description = "Custom domain for the site, e.g. \"school.chrissu.online\". Empty keeps the *.cloudfront.net name and creates no Route53 or ACM resources."
+  description = "Custom domain for the site, e.g. \"school.example.com\". Empty keeps the *.cloudfront.net name and creates no Route53 or ACM resources."
   type        = string
   default     = ""
 }
 
 variable "hosted_zone_name" {
-  description = "Route53 zone that owns domain_name, e.g. \"chrissu.online\". Required when domain_name is set. Using a subdomain of a zone you already have avoids a second hosted zone at $0.50/month."
+  description = "Route53 zone that owns domain_name, e.g. \"example.com\". Required when domain_name is set. Using a subdomain of a zone you already have avoids a second hosted zone at $0.50/month."
   type        = string
   default     = ""
 }

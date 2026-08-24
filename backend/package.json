@@ -14,11 +14,14 @@
     "routes:emit": "tsx scripts/emit-routes.ts",
     "build:handlers": "tsx scripts/build-handlers.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed:aws": "tsx scripts/seed-aws.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.712.0",
+    "@aws-sdk/client-s3": "^3.1116.0",
     "@aws-sdk/lib-dynamodb": "^3.712.0",
+    "@aws-sdk/s3-presigned-post": "^3.1116.0",
     "cors": "^2.8.5",
     "express": "^5.1.0"
   },

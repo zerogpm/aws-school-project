@@ -8,5 +8,5 @@ project_name = "school"
 # A subdomain of a zone you already own costs nothing extra - a new hosted zone
 # is $0.50/month. The certificate is free, and lives in us-east-1 because
 # CloudFront accepts one from nowhere else.
-# domain_name      = "school.chrissu.online"
-# hosted_zone_name = "chrissu.online"
+# domain_name      = "school.example.com"
+# hosted_zone_name = "example.com"

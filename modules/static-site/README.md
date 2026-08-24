@@ -24,8 +24,8 @@ CloudFront distribution using Origin Access Control.
 | `media_glacier_ir_transition_days` | number | `90` | Days before cold media moves to Glacier IR |
 | `noncurrent_version_expiration_days` | number | `90` | Days before old versions are purged |
 | `cloudfront_price_class` | string | `PriceClass_100` | North America + Europe only |
-| `domain_name` | string | `""` | Custom domain, e.g. `school.chrissu.online`. Empty creates no Route53 or ACM resources |
-| `hosted_zone_name` | string | `""` | Zone that owns `domain_name`, e.g. `chrissu.online`. Required when `domain_name` is set |
+| `domain_name` | string | `""` | Custom domain, e.g. `school.example.com`. Empty creates no Route53 or ACM resources |
+| `hosted_zone_name` | string | `""` | Zone that owns `domain_name`, e.g. `example.com`. Required when `domain_name` is set |
 
 `media_glacier_ir_transition_days` is validated to be at least 30 days after the
 Standard-IA transition, because S3 rejects a shorter gap at apply time rather

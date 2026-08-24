@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # The local stack: DynamoDB in Docker, the API, and the front end.
 #
-#   ./app.sh --start           start the database and create tables
-#   ./app.sh --start --api     also launch the backend API, detached
+#   ./app.sh --start           database, tables, seed, and the API on :3000
 #   ./app.sh --start --web     also launch the front end, detached
 #   ./app.sh --stop            stop everything, keep the data
 #   ./app.sh --stop --wipe     stop everything and delete the database
@@ -39,11 +38,6 @@ WIPE=false
 # a log nobody reads. --web is there for when you want one command.
 WEB=false
 
-# Same reasoning as --web, and the same escape hatch. The API server prints the
-# route table at boot, which is the fastest way to spot a handler that was never
-# added to backend/src/routes.ts - and detaching hides it.
-API=false
-
 SCAN_TABLE="local-school"
 
 while [ $# -gt 0 ]; do
@@ -51,9 +45,8 @@ while [ $# -gt 0 ]; do
     --start | --stop | --status | --scan) ACTION="${1#--}" ;;
     --wipe) WIPE=true ;;
     --web) WEB=true ;;
-    --api) API=true ;;
     -h | --help)
-      sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
@@ -69,7 +62,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$ACTION" ]; then
-  echo "usage: $0 [--start|--stop|--status|--scan] [--wipe] [--api] [--web]" >&2
+  echo "usage: $0 [--start|--stop|--status|--scan] [--wipe] [--web]" >&2
   exit 2
 fi
 
@@ -151,38 +144,36 @@ case "$ACTION" in
     wait_for_db
     (cd "$ROOT/backend" && npm run --silent db:tables)
 
-    if [ "$API" = true ]; then
-      if [ -n "$(pids_on_port "$API_PORT")" ]; then
-        echo "==> api already on :$API_PORT"
+    # Not behind a flag. Every reason to start the database is a reason to
+    # have the API in front of it, and a stack that needs two commands to be
+    # useful is a stack people run half of. `npm run dev` from backend/ is
+    # still there for watch mode in a foreground terminal.
+    if [ -n "$(pids_on_port "$API_PORT")" ]; then
+      echo "==> api already on :$API_PORT"
+    else
+      echo "==> api"
+      # Detached, output to a log, for the same reason as the front end below:
+      # the server outlives this script, and anything that inherits this
+      # terminal keeps it open.
+      # `start`, not `dev`. `dev` is tsx in watch mode, which belongs in the
+      # foreground of its own terminal; detached, its restarts happen silently
+      # and it keeps this script's pipe open.
+      (cd "$ROOT/backend" && nohup npm run --silent start >"$API_LOG" 2>&1 &)
+
+      # Probe the health endpoint rather than the port. A listening socket
+      # only proves express bound; a 200 from /health proves the whole wrapper
+      # - event construction, the handler, the response translation - works.
+      api_deadline=$((SECONDS + 30))
+      while [ "$SECONDS" -lt "$api_deadline" ]; do
+        curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/health" && break
+        sleep 0.5
+      done
+
+      if curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/health"; then
+        echo "    http://127.0.0.1:$API_PORT  (log: ${API_LOG#"$ROOT/"})"
       else
-        echo "==> api"
-        # Detached, output to a log, for the same reason as the front end below:
-        # the server outlives this script, and anything that inherits this
-        # terminal keeps it open.
-        # `start`, not `dev`. `dev` is tsx in watch mode, which belongs in the
-        # foreground of its own terminal; detached, its restarts happen silently
-        # and it keeps this script's pipe open.
-        (cd "$ROOT/backend" && nohup npm run --silent start >"$API_LOG" 2>&1 &)
-
-        # Probe the health endpoint rather than the port. A listening socket
-        # only proves express bound; a 200 from /health proves the whole wrapper
-        # - event construction, the handler, the response translation - works.
-        api_deadline=$((SECONDS + 30))
-        while [ "$SECONDS" -lt "$api_deadline" ]; do
-          curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/health" && break
-          sleep 0.5
-        done
-
-        if curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/health"; then
-          echo "    http://127.0.0.1:$API_PORT  (log: ${API_LOG#"$ROOT/"})"
-        else
-          echo "    did not come up - see ${API_LOG#"$ROOT/"}" >&2
-        fi
+        echo "    did not come up - see ${API_LOG#"$ROOT/"}" >&2
       fi
-    fi
-
-    if [ "$API" = false ]; then
-      echo "==> api: cd backend && npm run dev   (watch mode, or re-run with --api)"
     fi
 
     if [ "$WEB" = true ]; then

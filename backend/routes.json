@@ -23,5 +23,126 @@
       "TABLE_NAME"
     ],
     "timeout": 10
+  },
+  {
+    "name": "create-window",
+    "method": "POST",
+    "path": "/windows",
+    "entry": "src/handlers/windows/create-window.ts",
+    "auth": "staff",
+    "access": "readwrite",
+    "env": [
+      "ALLOWED_ORIGINS",
+      "TABLE_NAME"
+    ],
+    "timeout": 30
+  },
+  {
+    "name": "list-slots",
+    "method": "GET",
+    "path": "/windows/{id}/slots",
+    "entry": "src/handlers/windows/list-slots.ts",
+    "auth": "public",
+    "access": "read",
+    "env": [
+      "ALLOWED_ORIGINS",
+      "TABLE_NAME"
+    ],
+    "timeout": 10
+  },
+  {
+    "name": "create-booking",
+    "method": "POST",
+    "path": "/bookings",
+    "entry": "src/handlers/bookings/create-booking.ts",
+    "auth": "public",
+    "access": "readwrite",
+    "env": [
+      "ALLOWED_ORIGINS",
+      "TABLE_NAME"
+    ],
+    "timeout": 10
+  },
+  {
+    "name": "list-bookings",
+    "method": "GET",
+    "path": "/windows/{id}/bookings",
+    "entry": "src/handlers/bookings/list-bookings.ts",
+    "auth": "staff",
+    "access": "read",
+    "env": [
+      "ALLOWED_ORIGINS",
+      "TABLE_NAME"
+    ],
+    "timeout": 10
+  },
+  {
+    "name": "cancel-booking",
+    "method": "DELETE",
+    "path": "/bookings/{ref}",
+    "entry": "src/handlers/bookings/cancel-booking.ts",
+    "auth": "public",
+    "access": "readwrite",
+    "env": [
+      "ALLOWED_ORIGINS",
+      "TABLE_NAME"
+    ],
+    "timeout": 10
+  },
+  {
+    "name": "lookup-bookings",
+    "method": "POST",
+    "path": "/bookings/lookup",
+    "entry": "src/handlers/bookings/lookup-bookings.ts",
+    "auth": "public",
+    "access": "read",
+    "env": [
+      "ALLOWED_ORIGINS",
+      "TABLE_NAME"
+    ],
+    "timeout": 10
+  },
+  {
+    "name": "create-upload",
+    "method": "POST",
+    "path": "/uploads",
+    "entry": "src/handlers/documents/create-upload.ts",
+    "auth": "staff",
+    "access": "none",
+    "bucket": "write",
+    "env": [
+      "ALLOWED_ORIGINS",
+      "MEDIA_BUCKET"
+    ],
+    "timeout": 10
+  },
+  {
+    "name": "list-documents",
+    "method": "GET",
+    "path": "/documents",
+    "entry": "src/handlers/documents/list-documents.ts",
+    "auth": "public",
+    "access": "none",
+    "bucket": "read",
+    "env": [
+      "ALLOWED_ORIGINS",
+      "MEDIA_BASE_URL",
+      "MEDIA_BUCKET"
+    ],
+    "timeout": 10
+  },
+  {
+    "name": "delete-document",
+    "method": "DELETE",
+    "path": "/documents/{id}",
+    "entry": "src/handlers/documents/delete-document.ts",
+    "auth": "staff",
+    "access": "none",
+    "bucket": "delete",
+    "env": [
+      "ALLOWED_ORIGINS",
+      "MEDIA_BUCKET"
+    ],
+    "timeout": 10
   }
 ]

@@ -11,6 +11,8 @@ export default defineConfig({
     // has to supply them the same way the local server does.
     env: {
       TABLE_NAME: "local-school",
+      MEDIA_BUCKET: "local-media",
+      MEDIA_BASE_URL: "https://cdn.test",
       ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173",
     },
   },

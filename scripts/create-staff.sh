@@ -48,7 +48,15 @@ run() {
   fi
 }
 
-POOL="$(terraform -chdir="$ROOT/$STAGE" output -raw user_pool_id 2>/dev/null || true)"
+# USER_POOL_ID wins over the stage output, because a local-exec provisioner
+# running *inside* an apply of that same stage cannot read its own output - the
+# state is locked, and `terraform output` either blocks or fails. The stage
+# passes the id through the environment instead; a human running this by hand
+# passes nothing and gets the lookup.
+POOL="${USER_POOL_ID:-}"
+if [ -z "$POOL" ]; then
+  POOL="$(terraform -chdir="$ROOT/$STAGE" output -raw user_pool_id 2>/dev/null || true)"
+fi
 if [ -z "$POOL" ]; then
   echo "error: no user_pool_id output in $STAGE - is the stage applied?" >&2
   exit 1
@@ -57,9 +65,14 @@ echo "==> pool $POOL"
 
 # A group that does not exist is accepted by the API only to fail later, and
 # the error names the group without saying it is unknown. Catch the typo here.
+#
+# --output text separates a list with TABS, so the space-padded pattern below
+# matched nothing in a pool with more than one group: it rejected 'office'
+# while printing 'office' among the available ones. Normalise first.
 if [ -n "$GROUP" ]; then
   groups="$(aws cognito-idp list-groups --user-pool-id "$POOL" \
-    --query 'Groups[].GroupName' --output text 2>/dev/null || true)"
+    --query 'Groups[].GroupName' --output text 2>/dev/null \
+    | tr -s '[:space:]' ' ' || true)"
   case " $groups " in
     *" $GROUP "*) : ;;
     *)

@@ -112,7 +112,7 @@ exactly the things worth testing.
 DynamoDB runs in Docker, so handler work needs no AWS account either:
 
 ```
-./app.sh --start           database and tables
+./app.sh --start           database, tables, seed, and the API on :3000
 ./app.sh --start --web     also launch the front end
 ./app.sh --status          containers, ports, tables
 ./app.sh --stop            stop everything, keep the data

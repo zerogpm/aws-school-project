@@ -1,3 +1,14 @@
+locals {
+  # The top-level prefixes inside the media bucket, and therefore the paths this
+  # distribution routes to it. The same three the lifecycle rules in buckets.tf
+  # name - photos/ and video/ age into Glacier IR, docs/ deliberately does not.
+  #
+  # They are listed here rather than derived because the two files agree by
+  # intent, not by mechanism: a prefix that gets a cache behaviour but no
+  # lifecycle rule is a decision, and it should read like one.
+  media_prefixes = ["docs", "photos", "video"]
+}
+
 # Managed policies rather than hand-rolled ones: AWS keeps them current, and
 # there is nothing school-specific about caching a static asset.
 data "aws_cloudfront_cache_policy" "optimized" {
@@ -54,15 +65,27 @@ resource "aws_cloudfront_distribution" "this" {
   # Media is immutable once uploaded and rarely read, but when it is read it
   # should come from the edge - pulling a 200MB concert video out of Glacier IR
   # in ca-central-1 on every view is the expensive path.
-  ordered_cache_behavior {
-    path_pattern               = "/media/*"
-    target_origin_id           = "media"
-    viewer_protocol_policy     = "redirect-to-https"
-    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
-    cached_methods             = ["GET", "HEAD"]
-    compress                   = true
-    cache_policy_id            = data.aws_cloudfront_cache_policy.optimized.id
-    response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security.id
+  #
+  # One behaviour per real prefix, not a single "/media/*". CloudFront does not
+  # strip a matched path prefix before asking the origin - there is no such
+  # setting, and origin_path only ever *prepends* - so "/media/*" against this
+  # bucket asked S3 for "media/docs/x.pdf" while the object is at "docs/x.pdf".
+  # Every document 403'd, and the SPA fallback below turned that 403 into a
+  # 200 serving index.html, so it looked like a working page rather than a
+  # missing file. Nothing published was reachable until this matched the keys.
+  dynamic "ordered_cache_behavior" {
+    for_each = local.media_prefixes
+
+    content {
+      path_pattern               = "/${ordered_cache_behavior.value}/*"
+      target_origin_id           = "media"
+      viewer_protocol_policy     = "redirect-to-https"
+      allowed_methods            = ["GET", "HEAD", "OPTIONS"]
+      cached_methods             = ["GET", "HEAD"]
+      compress                   = true
+      cache_policy_id            = data.aws_cloudfront_cache_policy.optimized.id
+      response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security.id
+    }
   }
 
   # SPA fallback. React Router owns the URL space, so /timetable is not an
@@ -80,9 +103,16 @@ resource "aws_cloudfront_distribution" "this" {
   # cached error from before it existed.
   #
   # Trade-off, stated because custom error responses are distribution-wide: a
-  # genuinely missing asset under /media/* also returns index.html rather than a
-  # real 404. Fixing that needs a CloudFront Function, which is not worth it
-  # here - React Router renders its own 404 for unknown routes.
+  # genuinely missing asset under docs/, photos/ or video/ also returns
+  # index.html rather than a real 404. Fixing that needs a CloudFront Function,
+  # which is not worth it here - React Router renders its own 404 for unknown
+  # routes.
+  #
+  # It is not free, though, and it cost a debugging session: while the media
+  # behaviour pointed at the wrong prefix, every document request 403'd and came
+  # back as `200 text/html`. curl said success and the browser rendered the app.
+  # If a media URL ever looks like it works, check the Content-Type before
+  # believing it.
   custom_error_response {
     error_code            = 403
     response_code         = 200

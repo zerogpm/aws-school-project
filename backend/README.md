@@ -107,7 +107,7 @@ npm run routes:emit      regenerate routes.json from routes.ts
 npm run build:handlers   bundle src/ into dist/<route>/index.mjs
 ```
 
-Or from the repo root, `./app.sh --start --api`, which brings up the database
+Or from the repo root, `./app.sh --start`, which brings up the database
 first and probes `/health` before reporting the API as up.
 
 ## Testing
@@ -139,8 +139,7 @@ Needs Docker running. Nothing here touches AWS — no account, no credentials.
 One script, from the repo root:
 
 ```
-./app.sh --start           database and tables
-./app.sh --start --api     also launch the backend API, detached
+./app.sh --start           database, tables, seed, and the API on :3000
 ./app.sh --start --web     also launch the front end, detached
 ./app.sh --status          containers, ports, tables
 ./app.sh --scan [table]    dump a table

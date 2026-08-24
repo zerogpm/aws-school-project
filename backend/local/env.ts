@@ -29,6 +29,19 @@ process.env.TABLE_NAME ||= "local-school";
 // the preview build the Playwright suite runs against. One list, read by the
 // cors middleware and by the handlers' own CORS headers, so local cannot drift
 // from what modules/booking/api.tf allows.
+// The real bucket, because there is no local S3 and no seam for one - see
+// src/media.ts. Overridden by whatever a deployed stage is called; this default
+// is only useful once a stage has been applied.
+process.env.MEDIA_BUCKET ||= "school-media-local";
+
+// Where a browser fetches a published document. Deployed this is the
+// CloudFront distribution, which serves the site and the media bucket from one
+// origin; locally the vite dev server is not that distribution and has no
+// docs/ to serve, so a link built from this default will 404. That is the
+// honest local behaviour - there is no local S3 and no local CDN - and pointing
+// it at a deployed stage is what makes the links work from a laptop.
+process.env.MEDIA_BASE_URL ||= "http://127.0.0.1:5173";
+
 process.env.ALLOWED_ORIGINS ||=
   "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173";
 

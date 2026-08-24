@@ -7,7 +7,7 @@ import { TABLE_NAME } from "./schema.js";
 // Against the real container, so this is skipped rather than failed when it is
 // not running - a clean checkout without Docker should still get a green suite.
 //
-//   ./scripts/local-db.sh up
+//   ./app.sh --start
 const ENDPOINT = process.env.DYNAMODB_ENDPOINT ?? "http://127.0.0.1:8000";
 const client = DynamoDBDocumentClient.from(
   new DynamoDBClient(clientConfig({ ...process.env, DYNAMODB_ENDPOINT: ENDPOINT })),
@@ -28,7 +28,7 @@ const reachable = await (async () => {
 
 if (!reachable) {
   console.warn(
-    `[skipped] no ${TABLE_NAME} at ${ENDPOINT} - run ./scripts/local-db.sh up to include these`,
+    `[skipped] no ${TABLE_NAME} at ${ENDPOINT} - run ./app.sh --start to include these`,
   );
 }
 

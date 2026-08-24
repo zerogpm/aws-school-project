@@ -11,14 +11,38 @@ import { requireEnv } from "./env.js";
 // Single-table design, so one table holds bookings, interview windows, the
 // published timetable and staff profiles, distinguished by key prefix:
 //
-//   PK                      SK                      what it is
-//   WINDOW#<id>             META                    an interview window
-//   WINDOW#<id>             SLOT#<iso>              a bookable slot
-//   BOOKING#<id>            META                    a parent's booking
-//   STUDENT#<number>        BOOKING#<id>            that student's bookings
+//   PK                      SK                          what it is
+//   WINDOW#<id>             META                        an interview window
+//   WINDOW#<id>             SLOT#<iso>#<teacher>        a bookable slot
+//   STUDENT#<number>        PROFILE                     a student the office loaded
+//   STUDENT#<number>        CLAIM#<window>#<teacher>    one-per-teacher guard
+//   BOOKING#<ref>           META                        a parent's booking
 //
-// GSI1 answers "everything for this teacher, newest first", which no primary
-// key layout can serve without duplicating the item.
+// The keys themselves are built in src/booking/keys.ts, not spelled out at each
+// call site - a key assembled two ways does not error, it simply finds nothing.
+//
+// Two of these are load-bearing in a way their names do not show:
+//
+// The slot key leads with the timestamp, so one query on WINDOW#<id> returns
+// the whole evening already in chronological order. Both the parent's list and
+// the office's roster want exactly that, and neither has to sort.
+//
+// CLAIM# is not data. It exists to be written with attribute_not_exists inside
+// the booking transaction, which is what makes "one slot per teacher per
+// family" atomic rather than a read followed by a hopeful write.
+//
+// GSI1 answers "every window", which the primary key cannot without a scan:
+// each window's META item carries GSI1PK = "WINDOWS" and GSI1SK = its opening
+// time. Slots are deliberately absent from the index - they are only ever read
+// through their window's partition, and a sparse GSI costs nothing for the rows
+// it does not contain.
+//
+// Known and accepted: WINDOW#<id> is a low-cardinality partition key, so one
+// evening's bookings all land on one partition. That is the textbook hot-key
+// anti-pattern. At ~300 bookings across a three-hour evening it is roughly 0.03
+// writes a second against a 1000 WCU partition limit, so it is a rounding error
+// here - but it is the first thing to revisit if this ever serves a district
+// rather than a school.
 
 // No default. A deployed Lambda that never received TABLE_NAME would otherwise
 // address a table called "local-school" in real AWS and fail with a

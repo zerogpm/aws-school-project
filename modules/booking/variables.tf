@@ -29,6 +29,35 @@ variable "jwt_audience" {
   type        = list(string)
 }
 
+variable "media_bucket_name" {
+  description = <<-EOT
+    The media bucket from modules/static-site. Routes declaring `bucket` in the
+    manifest receive it as MEDIA_BUCKET and get an IAM grant scoped to docs/.
+
+    Passed in rather than looked up, so this module stays independent of how the
+    bucket is named and a stage can point it somewhere else.
+  EOT
+  type        = string
+}
+
+variable "media_bucket_arn" {
+  description = "ARN of the same bucket. The IAM grants need the arn; the handler needs the name."
+  type        = string
+}
+
+variable "media_base_url" {
+  description = <<-EOT
+    Origin a browser fetches a published document from, with no trailing slash.
+    Reaches list-documents as MEDIA_BASE_URL, which builds one URL per object.
+
+    The CloudFront distribution, not the bucket. Both buckets are private and
+    reached only through OAC, so an s3.amazonaws.com URL answers 403 - and the
+    distribution already serves the site from the same origin, which is what
+    makes a download link same-origin and `<a download>` work at all.
+  EOT
+  type        = string
+}
+
 variable "build_handlers" {
   description = <<-EOT
     Run esbuild over backend/src as part of the apply. Requires node locally.

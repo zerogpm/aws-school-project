@@ -84,5 +84,8 @@ describe("header", () => {
     await screen.findByRole("link", { name: /staff admin/i });
     expect(screen.getByRole("link", { name: /timetable/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /interviews/i })).toBeInTheDocument();
+    // Newsletters and forms are public. A page parents cannot find from the
+    // header is a page that does not exist to them.
+    expect(screen.getByRole("link", { name: /documents/i })).toBeInTheDocument();
   });
 });

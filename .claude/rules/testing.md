@@ -35,7 +35,7 @@ needs all three — see `.claude/rules/handlers.md`.
   groups have retention, `routes.json` is current.
 
 **E2E:** `site/e2e/api.spec.ts`, real HTTP against the real wrapper and the real
-container. Needs `./app.sh --start --api`; it skips when the API is not
+container. Needs `./app.sh --start`; it skips when the API is not
 answering, so a checkout without Docker still goes green.
 
 A test that cannot fail is decoration. When adding a parity or env-var

@@ -83,8 +83,16 @@ describe("Admin page", () => {
       btoa(JSON.stringify(v)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     // Inside the renewal margin: still valid, but due for renewal.
     signIn({ expiresAt: Date.now() + 60_000 });
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
+
+    // Routed by URL, not a blanket mockResolvedValue: the page also lists
+    // published documents on mount, and a single canned response would be
+    // consumed by whichever call happened to go first.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input).includes("/documents")) {
+        return new Response(JSON.stringify({ documents: [] }), { status: 200 });
+      }
+
+      return new Response(
         JSON.stringify({
           AuthenticationResult: {
             IdToken: `${b64({ alg: "RS256" })}.${b64({ email: "renewed@maplewood.example" })}.sig`,
@@ -93,8 +101,8 @@ describe("Admin page", () => {
           },
         }),
         { status: 200 },
-      ),
-    );
+      );
+    });
 
     renderAdmin();
 
@@ -113,14 +121,27 @@ describe("Admin page", () => {
     expect(await screen.findByText(/office, staff/)).toBeInTheDocument();
   });
 
-  it("lists what a teacher will be able to do here", async () => {
+  it("offers the upload form to a signed-in teacher", async () => {
     signIn();
     renderAdmin();
 
-    const tasks = await screen.findAllByRole("listitem");
-    expect(tasks).toHaveLength(4);
-    expect(screen.getByRole("heading", { name: /upload documents/i })).toBeInTheDocument();
+    // Two promises left. Uploading is no longer one of them - it has its own
+    // section above, which is the point of the change.
+    await screen.findByRole("heading", { name: /publish a document/i });
     expect(screen.getByRole("heading", { name: /publish the timetable/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /open interview windows/i })).toBeInTheDocument();
+  });
+
+  it("says what is actually built rather than naming an episode", async () => {
+    // Three of these cards said "arrives in 04-booking" while 04 shipped
+    // booking. A stage name goes stale silently; a status claim about today
+    // goes stale loudly, which is the point of the change.
+    signIn();
+    renderAdmin();
+
+    expect(await screen.findByText(/API only - no page yet/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/^Planned$/i)).toHaveLength(1);
+    expect(screen.queryByText(/arrives in/i)).not.toBeInTheDocument();
   });
 
   it("revokes the refresh token server-side and returns to the public site", async () => {
@@ -141,8 +162,12 @@ describe("Admin page", () => {
     // Revocation matters: enable_token_revocation is what makes signing out
     // actually invalidate the refresh token instead of waiting weeks for it
     // to expire on its own.
-    const headers = fetchSpy.mock.calls[0][1]?.headers as Record<string, string>;
-    expect(headers["X-Amz-Target"]).toBe("AWSCognitoIdentityProviderService.RevokeToken");
+    const revoke = fetchSpy.mock.calls.find(
+      (call) =>
+        (call[1]?.headers as Record<string, string> | undefined)?.["X-Amz-Target"] ===
+        "AWSCognitoIdentityProviderService.RevokeToken",
+    );
+    expect(revoke, "no RevokeToken call was made").toBeDefined();
     expect(sessionStorage.getItem("staff.session")).toBeNull();
     expect(assign).toHaveBeenCalledWith("/");
   });

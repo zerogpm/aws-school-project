@@ -2,6 +2,7 @@ export const NAV = [
   { to: "/", label: "Home" },
   { to: "/timetable", label: "Timetable" },
   { to: "/interviews", label: "Interviews" },
+  { to: "/documents", label: "Documents" },
 ];
 
 export const FACTS = [
@@ -19,19 +20,10 @@ export const TIMETABLE = [
   { period: "4", time: "1:35 - 2:50", dayA: "Physical Education", dayB: "Visual Arts 11" },
 ];
 
-export type Slot = {
-  id: string;
-  label: string;
-  teacher: string;
-  full?: boolean;
-};
-
-export const SLOTS: Slot[] = [
-  { id: "slot-1", label: "Tue 14 Oct - 5:00 pm", teacher: "Ms. Okafor - Mathematics" },
-  { id: "slot-2", label: "Tue 14 Oct - 5:20 pm", teacher: "Ms. Okafor - Mathematics" },
-  { id: "slot-3", label: "Tue 14 Oct - 5:40 pm", teacher: "Mr. Levesque - Science", full: true },
-  { id: "slot-4", label: "Wed 15 Oct - 6:00 pm", teacher: "Mr. Levesque - Science" },
-];
+// The slot fixtures that used to live here are gone. From episode 04 the times
+// come from GET /windows/{id}/slots against the real table, and availability is
+// computed from the item rather than being a hardcoded `full: true`.
+// See src/api/interviews.ts.
 
 /**
  * A student number is S followed by five digits. This is the only gate on the

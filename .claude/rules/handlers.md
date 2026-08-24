@@ -56,7 +56,7 @@ reading `undefined` from fields the other version populates.
    it read an env var the manifest does not declare. *That check is the only
    thing standing between you and a variable that is set process-wide locally and
    `undefined` in production.*
-6. **Exercise it against the real local table**: `./app.sh --start --api`, then
+6. **Exercise it against the real local table**: `./app.sh --start`, then
    curl it. *Confirm the route appears in the boot banner — if it does not, the
    manifest entry is missing.*
 7. **e2e** in `site/e2e/api.spec.ts`, against the running API.
@@ -71,7 +71,7 @@ None of these touch AWS or cost anything — the datastore is DynamoDB Local in
 Docker.
 
 ```
-./app.sh --start --api     database, tables, seed, and the API on :3000
+./app.sh --start           database, tables, seed, and the API on :3000
 ./app.sh --start --web     also the front end on :5173
 ./app.sh --status          what is running, and what is in the database
 ./app.sh --scan [table]    dump a table

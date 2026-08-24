@@ -1,27 +1,30 @@
 import { useAuth } from "../auth/authState";
+import DocumentUpload from "../components/DocumentUpload";
 
-// What a signed-in teacher will eventually do here. Each one is a later
-// episode: the storage exists, the API that writes to it does not yet.
-const TASKS = [
+// What a signed-in teacher can do here, and what is still a promise.
+//
+// `status` rather than a stage name, because a stage name goes stale the moment
+// that episode ships something else - three of these said "arrives in
+// 04-booking" while 04 was busy being the booking episode. Status is a claim
+// about today, so it is wrong loudly rather than quietly.
+type TaskStatus = "ready" | "api-only" | "planned";
+
+const STATUS_LABEL: Record<TaskStatus, string> = {
+  ready: "Available now",
+  "api-only": "API only - no page yet",
+  planned: "Planned",
+};
+
+const TASKS: { title: string; body: string; status: TaskStatus }[] = [
   {
-    title: "Upload documents",
-    body: "Newsletters, permission forms and the year calendar, straight to S3 under docs/ with a presigned URL.",
-    stage: "04-booking",
-  },
-  {
-    title: "Upload photos and video",
-    body: "Event media under photos/ and video/, which age into cheaper storage on their own.",
-    stage: "04-booking",
+    title: "Open interview windows",
+    body: "Set the evening parents can book against, and see who has booked. The API exists - POST /windows and GET /windows/{id}/bookings - but nothing on this page calls it yet.",
+    status: "api-only",
   },
   {
     title: "Publish the timetable",
-    body: "Replace the published semester timetable the whole school reads.",
-    stage: "03-data",
-  },
-  {
-    title: "Open interview windows",
-    body: "Set the evening parents can book against, and see who has booked.",
-    stage: "04-booking",
+    body: "Replace the published semester timetable the whole school reads. The single table can hold it; nothing writes it.",
+    status: "planned",
   },
 ];
 
@@ -56,7 +59,19 @@ export default function Admin() {
       </div>
 
       <div className="mx-auto max-w-6xl px-6 py-16">
-        <h2 className="font-serif text-xl font-semibold">What you can do here</h2>
+        <section aria-labelledby="documents" className="rounded-lg border border-line p-6">
+          <h2 id="documents" className="font-serif text-xl font-semibold text-forest-900">
+            Publish a document
+          </h2>
+          <p className="mt-1.5 mb-6 text-sm text-muted">
+            Newsletters, permission forms and the year calendar. Office staff only &mdash; the
+            API refuses anyone else, so this page not showing it is a convenience, not the
+            protection.
+          </p>
+          <DocumentUpload />
+        </section>
+
+        <h2 className="mt-12 font-serif text-xl font-semibold">Still to come</h2>
         <ul className="mt-6 grid gap-4 sm:grid-cols-2">
           {TASKS.map((task) => (
             <li
@@ -65,8 +80,12 @@ export default function Admin() {
             >
               <h3 className="font-medium text-ink">{task.title}</h3>
               <p className="mt-2 text-sm text-muted">{task.body}</p>
-              <p className="mt-3 text-xs uppercase tracking-wide text-muted">
-                Arrives in {task.stage}
+              <p
+                className={`mt-3 text-xs uppercase tracking-wide ${
+                  task.status === "ready" ? "text-forest-700" : "text-muted"
+                }`}
+              >
+                {STATUS_LABEL[task.status]}
               </p>
             </li>
           ))}

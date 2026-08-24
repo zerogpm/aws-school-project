@@ -43,6 +43,21 @@ export type Route = {
   readonly access: "none" | "read" | "readwrite";
 
   /**
+   * Least-privilege media-bucket access, scoped to docs/.
+   *
+   * A second axis rather than more values on `access`, because the two grants
+   * are independent: list-documents touches S3 and never the table, and every
+   * booking route is the reverse. Folding them into one enum would produce
+   * "readwrite-and-s3-write" and a policy generator nobody can read.
+   *
+   * "read" is ListBucket on the prefix plus GetObject; "write" is PutObject;
+   * "delete" is ListBucket plus DeleteObject. None implies another - the upload
+   * route signs a policy and never lists, the public list never writes, and the
+   * delete route has to find an object before removing it but may not read one.
+   */
+  readonly bucket?: "read" | "write" | "delete";
+
+  /**
    * Every environment variable the handler reads, including transitively
    * through a shared helper. src/routes.parity.test.ts imports each handler in
    * isolation and fails if it asked for one that is not listed here.
@@ -74,6 +89,129 @@ export const routes = [
     auth: "staff",
     access: "read",
     env: ["ALLOWED_ORIGINS", "TABLE_NAME"],
+    timeout: 10,
+  },
+  {
+    name: "create-window",
+    method: "POST",
+    path: "/windows",
+    entry: "src/handlers/windows/create-window.ts",
+    // Office staff, checked in the handler against cognito:groups - the
+    // authorizer can validate a token but cannot read an arbitrary claim.
+    auth: "staff",
+    access: "readwrite",
+    env: ["ALLOWED_ORIGINS", "TABLE_NAME"],
+    // Longer than the rest: this writes the whole grid, which is 540 items for
+    // sixty teachers, in batches of 25.
+    timeout: 30,
+  },
+  {
+    name: "list-slots",
+    method: "GET",
+    path: "/windows/{id}/slots",
+    entry: "src/handlers/windows/list-slots.ts",
+    // Public: a parent has no account and this is the page they came for. The
+    // projection is the boundary here, not the authorizer - see toPublicSlot.
+    auth: "public",
+    access: "read",
+    env: ["ALLOWED_ORIGINS", "TABLE_NAME"],
+    timeout: 10,
+  },
+  {
+    name: "create-booking",
+    method: "POST",
+    path: "/bookings",
+    entry: "src/handlers/bookings/create-booking.ts",
+    // Public write, gated by student number and throttled at the API. The
+    // conditional write is what makes it safe, not the caller's identity.
+    auth: "public",
+    access: "readwrite",
+    env: ["ALLOWED_ORIGINS", "TABLE_NAME"],
+    timeout: 10,
+  },
+  {
+    name: "list-bookings",
+    method: "GET",
+    path: "/windows/{id}/bookings",
+    entry: "src/handlers/bookings/list-bookings.ts",
+    auth: "staff",
+    access: "read",
+    env: ["ALLOWED_ORIGINS", "TABLE_NAME"],
+    timeout: 10,
+  },
+  {
+    name: "cancel-booking",
+    method: "DELETE",
+    path: "/bookings/{ref}",
+    entry: "src/handlers/bookings/cancel-booking.ts",
+    // Public, because there are no parent accounts. The booking reference is a
+    // v4 uuid and acts as the capability; the student number is a second factor.
+    auth: "public",
+    access: "readwrite",
+    env: ["ALLOWED_ORIGINS", "TABLE_NAME"],
+    timeout: 10,
+  },
+  {
+    name: "lookup-bookings",
+    method: "POST",
+    path: "/bookings/lookup",
+    entry: "src/handlers/bookings/lookup-bookings.ts",
+    // Public, and keyed on a booking reference plus the student number. A
+    // lookup by student number alone would let anyone who guessed one read a
+    // family's evening; a reference is unguessable and proves membership.
+    //
+    // POST because the reference is a credential and does not belong in a URL,
+    // a browser history or an access log.
+    auth: "public",
+    access: "read",
+    env: ["ALLOWED_ORIGINS", "TABLE_NAME"],
+    timeout: 10,
+  },
+  {
+    name: "create-upload",
+    method: "POST",
+    path: "/uploads",
+    entry: "src/handlers/documents/create-upload.ts",
+    // Office staff, checked in the handler - the authorizer cannot read
+    // cognito:groups. The signed policy it returns is a bearer capability, so
+    // this route is the only gate that exists.
+    auth: "staff",
+    // No table at all. This route signs a policy and touches nothing else.
+    access: "none",
+    bucket: "write",
+    env: ["ALLOWED_ORIGINS", "MEDIA_BUCKET"],
+    timeout: 10,
+  },
+  {
+    name: "list-documents",
+    method: "GET",
+    path: "/documents",
+    entry: "src/handlers/documents/list-documents.ts",
+    // Public: school newsletters and permission forms are meant to be read by
+    // every parent, and there are no parent accounts to gate them behind.
+    auth: "public",
+    access: "none",
+    bucket: "read",
+    // MEDIA_BASE_URL is read by this handler and not by media.ts, deliberately.
+    // Putting it in the shared helper would make create-upload read it
+    // transitively without declaring it, which routes.parity.test.ts fails on -
+    // correctly, because Terraform would then not pass it to that function.
+    env: ["ALLOWED_ORIGINS", "MEDIA_BASE_URL", "MEDIA_BUCKET"],
+    timeout: 10,
+  },
+  {
+    name: "delete-document",
+    method: "DELETE",
+    path: "/documents/{id}",
+    entry: "src/handlers/documents/delete-document.ts",
+    // Office staff, checked in the handler. Unpublishing is the destructive
+    // half of publishing and belongs behind the same gate.
+    auth: "staff",
+    access: "none",
+    // ListBucket to resolve the id to a key, DeleteObject to remove it. No
+    // GetObject: this route never needs to read what it is deleting.
+    bucket: "delete",
+    env: ["ALLOWED_ORIGINS", "MEDIA_BUCKET"],
     timeout: 10,
   },
 ] as const satisfies readonly Route[];

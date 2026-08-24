@@ -14,6 +14,15 @@ import express, { type NextFunction, type Request, type Response } from "express
 import type { APIGatewayProxyEventHeaders } from "aws-lambda";
 import { handler as health } from "../src/handlers/health.js";
 import { handler as listWindows } from "../src/handlers/windows/list-windows.js";
+import { handler as createWindow } from "../src/handlers/windows/create-window.js";
+import { handler as listSlots } from "../src/handlers/windows/list-slots.js";
+import { handler as createBooking } from "../src/handlers/bookings/create-booking.js";
+import { handler as listBookings } from "../src/handlers/bookings/list-bookings.js";
+import { handler as cancelBooking } from "../src/handlers/bookings/cancel-booking.js";
+import { handler as lookupBookings } from "../src/handlers/bookings/lookup-bookings.js";
+import { handler as createUpload } from "../src/handlers/documents/create-upload.js";
+import { handler as listDocuments } from "../src/handlers/documents/list-documents.js";
+import { handler as deleteDocument } from "../src/handlers/documents/delete-document.js";
 import type { ApiEvent, ApiResult, Handler } from "../src/handlers/http.js";
 import type { Route, RouteName } from "../src/routes.js";
 import { byStaticSegmentsFirst, pathParamNames, routes, toExpressPath } from "../src/routes.js";
@@ -28,6 +37,15 @@ import { byStaticSegmentsFirst, pathParamNames, routes, toExpressPath } from "..
 const handlers: Record<RouteName, Handler> = {
   health,
   "list-windows": listWindows,
+  "create-window": createWindow,
+  "list-slots": listSlots,
+  "create-booking": createBooking,
+  "list-bookings": listBookings,
+  "cancel-booking": cancelBooking,
+  "lookup-bookings": lookupBookings,
+  "create-upload": createUpload,
+  "list-documents": listDocuments,
+  "delete-document": deleteDocument,
 };
 
 /**

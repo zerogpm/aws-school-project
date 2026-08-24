@@ -52,7 +52,7 @@ authorizer working, not a failure.
 ## Developing against it without applying anything
 
 ```
-./app.sh --start --api
+./app.sh --start
 curl -s http://127.0.0.1:3000/health
 ```
 
@@ -78,7 +78,7 @@ Adding an endpoint, in order:
 3. Add the manifest entry, listing every env var it reads *transitively*.
 4. `npm run routes:emit`.
 5. `npm test` — the parity test confirms Terraform can supply what you declared.
-6. `./app.sh --start --api` and exercise it against the real local table.
+6. `./app.sh --start` and exercise it against the real local table.
 
 ## Decided in 02, before this stage is built
 

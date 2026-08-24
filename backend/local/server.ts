@@ -1,6 +1,6 @@
 // Boots the local API.
 //
-//   npm run dev            (or ./app.sh --start --api from the repo root)
+//   npm run dev            (or ./app.sh --start from the repo root)
 //
 // Ordering in this file is load-bearing. src/schema.ts resolves TABLE_NAME and
 // src/db.ts builds its client at module-load time, so every environment value

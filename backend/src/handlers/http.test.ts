@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { badRequest, buildCorsHeaders, getHeader, json, ok, parseBody, serverError } from "./http.js";
+import {
+  badRequest,
+  buildCorsHeaders,
+  conflict,
+  created,
+  getHeader,
+  json,
+  notFound,
+  ok,
+  parseBody,
+  serverError,
+} from "./http.js";
 import { apiEvent } from "./test-event.js";
 
 // ALLOWED_ORIGINS during the suite is set by vitest.config.ts, matching what
@@ -62,6 +73,30 @@ describe("responses", () => {
 
   it("passes the status through", () => {
     expect(json(apiEvent(), 418, {}).statusCode).toBe(418);
+  });
+
+  it("distinguishes the booking outcomes a parent has to act on differently", () => {
+    // 201 confirmed, 404 the student number is wrong, 409 someone was faster.
+    // Collapsing these into one status is what makes a booking failure
+    // unactionable - the parent cannot tell a typo from a lost race.
+    const event = apiEvent();
+    expect(created(event, { ref: "abc" }).statusCode).toBe(201);
+    expect(notFound(event).statusCode).toBe(404);
+    expect(conflict(event, "That time was just taken").statusCode).toBe(409);
+  });
+
+  it("says why in a 409, because 'conflict' is not something a parent can act on", () => {
+    const result = conflict(apiEvent(), "You already have a slot with this teacher");
+    expect(JSON.parse(result.body!)).toEqual({
+      error: "You already have a slot with this teacher",
+    });
+  });
+
+  it("carries CORS headers on the new statuses too", () => {
+    const event = apiEvent({ headers: { origin: ALLOWED } });
+    for (const result of [created(event, {}), notFound(event), conflict(event, "taken")]) {
+      expect(result.headers?.["Access-Control-Allow-Origin"]).toBe(ALLOWED);
+    }
   });
 });
 

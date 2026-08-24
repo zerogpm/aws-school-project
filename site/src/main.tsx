@@ -5,6 +5,7 @@ import App from "./App";
 import Home from "./routes/Home";
 import Timetable from "./routes/Timetable";
 import Interviews from "./routes/Interviews";
+import Documents from "./routes/Documents";
 import Staff from "./routes/Staff";
 import Admin from "./routes/Admin";
 import { AuthProvider } from "./auth/AuthContext";
@@ -24,6 +25,7 @@ createRoot(document.getElementById("root")!).render(
             <Route index element={<Home />} />
             <Route path="timetable" element={<Timetable />} />
             <Route path="interviews" element={<Interviews />} />
+            <Route path="documents" element={<Documents />} />
             <Route path="staff" element={<Staff />} />
             <Route
               path="admin"

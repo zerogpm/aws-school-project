@@ -20,6 +20,12 @@ export default defineConfig({
     env: {
       VITE_COGNITO_CLIENT_ID: "e2eclientid",
       VITE_COGNITO_REGION: "ca-central-1",
+
+      // The local wrapper, so the built bundle books against the real handlers
+      // and the real container rather than a stub. localhost:4173 is already in
+      // ALLOWED_ORIGINS (backend/local/env.ts), so CORS passes as it would from
+      // CloudFront. The interview specs skip themselves when it is not running.
+      VITE_API_URL: "http://127.0.0.1:3000",
     },
     url: "http://localhost:4173",
     reuseExistingServer: !process.env.CI,

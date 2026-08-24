@@ -10,7 +10,7 @@ variable "bucket_suffix" {
 
 variable "domain_name" {
   description = <<-EOT
-    Custom domain for the site, e.g. "school.chrissu.online".
+    Custom domain for the site, e.g. "school.example.com".
 
     Empty means no custom domain: the distribution keeps its *.cloudfront.net
     name and its default certificate, and no Route53 or ACM resources are
@@ -23,7 +23,7 @@ variable "domain_name" {
 
 variable "hosted_zone_name" {
   description = <<-EOT
-    Route53 zone that owns domain_name, e.g. "chrissu.online". Required when
+    Route53 zone that owns domain_name, e.g. "example.com". Required when
     domain_name is set.
 
     Named rather than derived from domain_name: a subdomain can be several
@@ -41,7 +41,7 @@ variable "hosted_zone_name" {
 
   validation {
     condition     = var.domain_name == "" || endswith(var.domain_name, var.hosted_zone_name)
-    error_message = "domain_name must sit inside hosted_zone_name, e.g. school.chrissu.online inside chrissu.online."
+    error_message = "domain_name must sit inside hosted_zone_name, e.g. school.example.com inside example.com."
   }
 }
 

@@ -130,8 +130,8 @@ export const handler = async (event: ApiEvent): Promise<ApiResult> => {
       }),
     );
 
-    // The slot's REMOVE is what episode 05's stream will watch to promote the
-    // next family off the waitlist. Nothing here emails anyone yet.
+    // The slot's REMOVE is what episode 05's stream will watch to send the
+    // cancellation email. Nothing here emails anyone yet.
     return ok(event, { bookingRef: ref, windowId, slotId, cancelled: true });
   } catch (error) {
     if (error instanceof TransactionCanceledException) {

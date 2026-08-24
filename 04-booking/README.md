@@ -258,13 +258,15 @@ bookings across three hours that is roughly 0.03 writes/second against a 1000 WC
 partition limit — a rounding error at this size, and the first thing to revisit
 if this ever served a district rather than one school.
 
-**No waitlist yet.** A full slot is a 409 and nothing more. The interviews page
-already promises a waitlist; `.claude/rules/data-model.md` has the atomic-counter
-and zero-padded-position design ready for `05-waitlist`.
+**No waitlist, and there will not be one.** A full slot is a 409 and nothing
+more. The atomic-counter and zero-padded-position design stays in
+`.claude/rules/data-model.md` as a thing that was designed, priced and then cut.
+The interviews page still promises one, which is copy to fix.
 
-**No confirmation email.** SES arrives in 05. For now the booking reference comes
+**No confirmation email.** SES arrives in 05, which is now the whole subject of
+that episode. For now the booking reference comes
 back in the response body, which is also what a parent needs to cancel.
 
 **No DynamoDB stream on the table.** Cancellation frees the slot by removing
-`bookedBy`, and that removal is the event 05 will watch to promote the next
-family. Building the stream now would mean building it twice.
+`bookedBy`, and that removal is the event 05 will watch to send the
+cancellation email. Building the stream now would mean building it twice.

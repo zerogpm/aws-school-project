@@ -104,7 +104,7 @@ resource "aws_cognito_user_pool" "staff" {
 
   # Cognito's built-in sender is capped at 50 emails a day, which is under the
   # sixty invites this pool eventually needs - so the first onboarding spans two
-  # days unless SES is wired in. SES arrives properly in 05-waitlist; this hook
+  # days unless SES is wired in. SES arrives properly in 05-email; this hook
   # lets a stage pass it down without editing the module.
   email_configuration {
     email_sending_account = local.use_ses ? "DEVELOPER" : "COGNITO_DEFAULT"

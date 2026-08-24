@@ -2,7 +2,7 @@
 paths:
   - "03-data/**"
   - "04-booking/**"
-  - "05-waitlist/**"
+  - "05-email/**"
   - "modules/booking/**"
 ---
 
@@ -86,6 +86,9 @@ WCU partition limit, so it is a rounding error at this size. It is the first
 thing to revisit if this ever serves a district rather than one school.
 
 ## Waitlist behaviour
+
+**Cut on 2026-08-24 — do not build this.** Kept as a worked design that was
+priced and refused, not as pending work. Episode 05 is confirmation email only.
 
 - Full → the response offers the waitlist with the current queue length. Opt-in
   only; joining is a second, separate API call.

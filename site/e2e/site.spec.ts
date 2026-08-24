@@ -83,6 +83,21 @@ test.describe("public site", () => {
     await expect(page.getByText(/download it to print and sign/i)).toBeVisible();
   });
 
+  test("the interviews page sets expectations without an API", async ({ page }) => {
+    // Reached directly and without a running API, like the documents test
+    // above: the notes are static, and they are the page's promise to a parent.
+    // The waiting list was designed and then cut, so the promise not to offer
+    // one is the part worth pinning.
+    await page.goto("/interviews");
+
+    await expect(
+      page.getByRole("heading", { name: /parent-teacher interviews/i }),
+    ).toBeVisible();
+    await expect(page.getByText(/one slot per teacher per family/i)).toBeVisible();
+    await expect(page.getByText(/there is no waiting list/i)).toBeVisible();
+    await expect(page.getByText(/join the wait/i)).toHaveCount(0);
+  });
+
   test("an unknown path renders the in-app 404, not a server error", async ({
     page,
   }) => {

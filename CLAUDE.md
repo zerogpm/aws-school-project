@@ -3,7 +3,7 @@
 Topic rules live in `.claude/rules/` and load automatically: `testing.md` and
 `debugging.md` every session; `terraform.md` when a `.tf` or `.tfvars` file is
 opened; `data-model.md` when working in `03-data/`, `04-booking/`,
-`05-waitlist/`, or `modules/booking/`; `handlers.md` when working in `backend/`
+`05-email/`, or `modules/booking/`; `handlers.md` when working in `backend/`
 or `modules/booking/`.
 
 ## Quality Checklist
@@ -63,10 +63,10 @@ they will fight over state.
 
 Region is `ca-central-1` — data must stay in Canada. Not negotiable.
 
-Current state: episodes 01 and 02 are built and the 03 harness is in place —
-the static site, Cognito, the single table, an HTTP API, and the first Lambda
-handlers with their local Express runtime. `04-booking` onward are still
-placeholder READMEs. No CI, by choice.
+Current state: episodes 01 through 04 are built — the static site, Cognito, the
+single table, an HTTP API, the Lambda handlers with their local Express runtime,
+and the booking transaction. `05-email` and `06-cost` are still placeholder
+READMEs. No CI, by choice.
 
 ## Business Model
 
@@ -149,14 +149,13 @@ when you are working in `backend/`. None of them touch AWS or cost anything.
   external because the runtime ships it. Handlers are pure
   `(event) => Promise<result>` functions, so the same file runs on Lambda, in
   the local Express wrapper, and in a test with no HTTP at all.
-- **Async:** DynamoDB Streams → Lambda → SES for confirmations and waitlist
-  promotion. No SQS.
+- **Async:** DynamoDB Streams → Lambda → SES for booking confirmations. No SQS.
 - **Guardrails** (this is the entire monitoring story): AWS Budgets alarm →
   email, Route53 health check → SNS email, DynamoDB point-in-time recovery. No
   dashboards, no paging alarms.
 
 Deliberately out of scope: CI/CD, dashboards, paging alarms, multi-region, RDS,
-containers, Kubernetes, VPC, waitlist claim expiry, parent accounts, payments,
+containers, Kubernetes, VPC, the interview waitlist, parent accounts, payments,
 grades. Each cut is stated on camera with its reason — the cuts are the content.
 
 ## Key Files

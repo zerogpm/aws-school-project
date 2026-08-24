@@ -4,7 +4,7 @@ import ManageBooking from "../components/ManageBooking";
 
 const NOTES = [
   "One slot per teacher per family.",
-  "If a slot is full you can join the waitlist and we will email you if it opens.",
+  "If a slot is full, choose another time - there is no waiting list, and a cancelled slot reopens straight away.",
   "To change a time, cancel the one you have and book again - it frees immediately.",
 ];
 

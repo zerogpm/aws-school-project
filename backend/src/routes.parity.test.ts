@@ -7,7 +7,8 @@
 // about: a variable that is set process-wide locally, so the feature works and
 // the suite is green, and absent on the deployed function, where the handler
 // quietly does nothing.
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { ROUTES_JSON, serialiseRoutes } from "../scripts/emit-routes.js";
@@ -19,8 +20,24 @@ const read = (relative: string) =>
 const buildTf = read("../../modules/booking/build.tf");
 const lambdaTf = read("../../modules/booking/lambda.tf");
 const apiTf = read("../../modules/booking/api.tf");
-const staffTf = read("../../04-booking/staff.tf");
 const cloudfrontTf = read("../../modules/static-site/cloudfront.tf");
+
+/**
+ * Every stage that ships the demo staff account, not just the newest one.
+ *
+ * This was pinned to `04-booking` back when 04 was the newest stage. 03 carries
+ * a byte-identical copy that nothing checked, so the file could drift in one
+ * stage while the suite stayed green - and any later stage would have been born
+ * unchecked too. Discovered from disk instead, so a stage is covered the day it
+ * grows a staff.tf.
+ */
+const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
+
+const staffStages = readdirSync(repoRoot, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && /^\d\d-/.test(entry.name))
+  .map((entry) => entry.name)
+  .filter((stage) => existsSync(join(repoRoot, stage, "staff.tf")))
+  .sort();
 
 /**
  * The same file with comments removed.
@@ -30,10 +47,11 @@ const cloudfrontTf = read("../../modules/static-site/cloudfront.tf");
  * aws_cognito_user", "cannot call terraform output". Matching raw text made
  * both tests fail on their own explanation.
  */
-const staffCode = staffTf
-  .split(/\r?\n/)
-  .filter((line) => !line.trim().startsWith("#"))
-  .join("\n");
+const staffCodeFor = (stage: string) =>
+  read(`../../${stage}/staff.tf`)
+    .split(/\r?\n/)
+    .filter((line) => !line.trim().startsWith("#"))
+    .join("\n");
 
 describe("routes.json", () => {
   it("is current", () => {
@@ -157,31 +175,40 @@ describe("least privilege", () => {
 });
 
 describe("the demo staff account", () => {
-  it("is a script, not an aws_cognito_user", () => {
-    // password and temporary_password are both sensitive, which in Terraform
-    // means plaintext in state - and destroy would delete every account in a
-    // workflow built on apply/verify/destroy. Decided in 02; this keeps it.
-    expect(staffCode).not.toContain("aws_cognito_user");
-    expect(staffCode).toContain("scripts/create-staff.sh");
+  it("is shipped by at least one stage, or the cases below prove nothing", () => {
+    // describe.each over an empty list is zero tests and a green run.
+    expect(staffStages).not.toHaveLength(0);
   });
 
-  it("keeps the password out of state", () => {
-    // triggers_replace is persisted. The password reaches the script through
-    // the provisioner environment, which is not.
-    const triggers = staffCode.split("triggers_replace")[1]?.split("}")[0] ?? "";
-    expect(triggers).not.toContain("password");
-    expect(staffCode).toContain("STAFF_PASSWORD = var.demo_staff_password");
-  });
+  describe.each(staffStages)("%s/staff.tf", (stage) => {
+    const staffCode = staffCodeFor(stage);
 
-  it("passes the pool id in rather than reading its own output", () => {
-    // A provisioner running inside an apply of this stage cannot call
-    // terraform output on it - the state is locked.
-    expect(staffCode).toContain("USER_POOL_ID = module.auth.user_pool_id");
-    expect(staffCode).not.toContain("terraform output");
-  });
+    it("is a script, not an aws_cognito_user", () => {
+      // password and temporary_password are both sensitive, which in Terraform
+      // means plaintext in state - and destroy would delete every account in a
+      // workflow built on apply/verify/destroy. Decided in 02; this keeps it.
+      expect(staffCode).not.toContain("aws_cognito_user");
+      expect(staffCode).toContain("scripts/create-staff.sh");
+    });
 
-  it("creates nothing unless an address is configured", () => {
-    expect(staffCode).toContain('count = var.demo_staff_email != "" ? 1 : 0');
+    it("keeps the password out of state", () => {
+      // triggers_replace is persisted. The password reaches the script through
+      // the provisioner environment, which is not.
+      const triggers = staffCode.split("triggers_replace")[1]?.split("}")[0] ?? "";
+      expect(triggers).not.toContain("password");
+      expect(staffCode).toContain("STAFF_PASSWORD = var.demo_staff_password");
+    });
+
+    it("passes the pool id in rather than reading its own output", () => {
+      // A provisioner running inside an apply of this stage cannot call
+      // terraform output on it - the state is locked.
+      expect(staffCode).toContain("USER_POOL_ID = module.auth.user_pool_id");
+      expect(staffCode).not.toContain("terraform output");
+    });
+
+    it("creates nothing unless an address is configured", () => {
+      expect(staffCode).toContain('count = var.demo_staff_email != "" ? 1 : 0');
+    });
   });
 });
 

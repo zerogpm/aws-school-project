@@ -14,11 +14,21 @@ output "table_name" {
 }
 
 output "table_arn" {
-  description = "Needed by a later stage to attach a stream to the table."
+  description = "The table itself. Handler IAM policies are scoped to this and its indexes."
   value       = aws_dynamodb_table.school.arn
+}
+
+output "table_stream_arn" {
+  description = "Stream the booking-email consumer reads. Empty when stream_enabled is false."
+  value       = aws_dynamodb_table.school.stream_arn
 }
 
 output "function_names" {
   description = "Deployed function name per route, for reading logs without guessing."
   value       = local.function_names
+}
+
+output "consumer_function_names" {
+  description = "Deployed function name per stream consumer. Empty until a stage wires SES."
+  value       = local.consumer_function_names
 }

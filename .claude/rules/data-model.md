@@ -85,6 +85,29 @@ At ~300 bookings across three hours that is ~0.03 writes/second against a 1000
 WCU partition limit, so it is a rounding error at this size. It is the first
 thing to revisit if this ever serves a district rather than one school.
 
+## Confirmation email
+
+- **The stream watches `BOOKING#<ref>/META`, and nothing else.** `INSERT` is a
+  booking made, `REMOVE` is a booking cancelled. One transaction writes four
+  items - the slot, the `CLAIM#` guard, the `TIME#` guard and the booking - and
+  only the booking carries `parentEmail`, so the event source mapping filters on
+  the `BOOKING#` partition prefix and three of every four records never cost an
+  invocation.
+- **`NEW_AND_OLD_IMAGES` is required, not preferred.** Cancellation deletes the
+  booking, so the address survives only in the old image. Under `NEW_IMAGE` a
+  cancellation arrives as bare keys and there is nobody left to mail.
+- **Send-once marker:** `EMAIL#<ref>` / `SENT#confirmation` | `SENT#cancellation`,
+  written with `attribute_not_exists` *before* the send. A stream batch is
+  retried, so at-least-once delivery of a record has to become exactly-once
+  delivery of a message. A failed send deletes the marker so the retry can
+  genuinely try again - claiming and never releasing would lose the mail
+  silently, which is the worse of the two failures.
+- **The marker lives outside the `BOOKING#` partition on purpose.** The consumer
+  writes to the table it is streaming from; a marker under `BOOKING#<ref>` would
+  match its own filter and wake it again.
+- **An absent `parentEmail` is a case, not an error.** It is optional, and
+  throwing would retry a record that can never succeed until the shard gave up.
+
 ## Waitlist behaviour
 
 **Cut on 2026-08-24 — do not build this.** Kept as a worked design that was

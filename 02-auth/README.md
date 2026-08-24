@@ -34,7 +34,7 @@ off a teacher who has no help desk.
 | TOTP MFA only, optional | SMS MFA needs an SNS caller role, bills per message, and means holding staff phone numbers | SMS MFA; mandatory MFA for sixty people with no help desk |
 | No symbol requirement, 12-char minimum | Length is the control that does the work. Symbol rules mostly generate forgotten passwords, and a lockout at 8pm has nobody to call | Complexity rules; `password_history_size` (an `ESSENTIALS` feature) |
 | Email-only account recovery | SMS recovery means collecting phone numbers and paying per message | Phone recovery; admin-only recovery |
-| Cognito's built-in email sender | Free, and enough for onboarding in batches. SES arrives with confirmations in `05-email` and can be passed down then | Wiring SES here, before anything else needs it |
+| Cognito's built-in email sender | Free, and enough for onboarding in batches. SES arrives with confirmations in `05-email` and is passed down there, behind a switch - in the SES sandbox it would reach fewer staff than the built-in sender, not more | Wiring SES here, before anything else needs it |
 | Hosted UI on `*.amazoncognito.com` | A custom `auth.` domain needs an ACM certificate in `us-east-1` and a Route53 record, for a page sixty people see a few times a term | Custom auth domain |
 | `/staff` is the redirect target | The page already exists in the SPA. The hosted UI returns there with `?code=` and the app exchanges it — no extra route, no server | A dedicated `/staff/callback` route |
 
@@ -92,7 +92,9 @@ does not exist.
 - No custom auth domain, and no custom domain on the site either.
 - No SES. Cognito's built-in sender is capped at 50 emails a day, which is under
   a full sixty-person onboarding — invite in batches, or pass `ses_source_arn`
-  to the module once `05-email` brings SES.
+  to the module. `05-email` brings SES and wires exactly this, though it leaves
+  the switch off: see that stage's README for why connecting it early is a
+  downgrade rather than an upgrade.
 
 ## Creating staff accounts
 

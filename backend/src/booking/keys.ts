@@ -65,3 +65,28 @@ export const timeSk = (windowId: string, startsAt: string): string =>
 export const bookingPk = (ref: string): string => `BOOKING#${ref}`;
 
 export const BOOKING_META_SK = "META";
+
+/**
+ * The send-once marker behind "a parent is not mailed twice".
+ *
+ * A stream batch is retried on failure, and a retry replays records that were
+ * already handled - so at-least-once delivery of the record has to become
+ * exactly-once delivery of the message somewhere, and this is that somewhere.
+ * Written with attribute_not_exists before the send; a failed condition means
+ * some earlier invocation already sent this one.
+ *
+ * Its own partition rather than an attribute on the booking, for two reasons and
+ * the second is the one that would have cost a day. The obvious one: the
+ * cancellation case has no booking left to write to - cancel-booking deletes
+ * BOOKING#<ref>/META, and that deletion *is* the event being mailed about.
+ *
+ * The other: the consumer writes this marker to the very table it is streaming
+ * from. A marker under BOOKING#<ref> would match the event source mapping's
+ * "PK begins with BOOKING#" filter and wake the consumer again - a bounded loop,
+ * but one that doubles invocations and stream reads for nothing. A different
+ * prefix is excluded by the filter and costs nothing at all.
+ */
+export const emailPk = (ref: string): string => `EMAIL#${ref}`;
+
+/** One marker per kind, so a cancellation is not suppressed by its confirmation. */
+export const sentSk = (kind: string): string => `SENT#${kind}`;

@@ -6,9 +6,12 @@
 // The local stack gets all of this from backend/local/seed.ts when app.sh
 // starts. A deployed stage got nothing, which meant a fresh apply produced a
 // booking page that correctly said "not open yet" and a demo that could not
-// start. scripts/seed-students.sh covered students only; windows were supposed
-// to come from POST /windows, which needs an office account and a token first -
-// too many steps to hit before filming.
+// start. An earlier scripts/seed-students.sh covered students only, and kept its
+// own copy of the roll to do it; windows were supposed to come from
+// POST /windows, which needs an office account and a token first - too many
+// steps to hit before filming. Both are gone. scripts/seed-stage.sh is now a
+// thin wrapper that reads the table name out of a stage's outputs and calls
+// this, so the data lives in exactly one place and the table name in none.
 //
 // This writes with the caller's own credentials rather than through the API, on
 // purpose. It is an operator tool, not a feature: the API path is still the one
@@ -74,6 +77,20 @@ const windows = [
   },
 ];
 
+// Every student's parent is the same inbox, on purpose.
+//
+// This is a demo school. There is no parent contact list and there is not going
+// to be one - the point is to show a real message arriving from a real booking,
+// and one verified address does that for any student you happen to pick on
+// camera. It also keeps the SES sandbox happy: until production access lands,
+// SES will only deliver to addresses that have been verified, and this is the
+// one that has.
+//
+// Kept identical in backend/local/seed.ts and backend/scripts/seed-aws.ts - one
+// for the container, one for a deployed table. If it drifts you find out
+// immediately, because the mail stops arriving.
+const DEMO_PARENT_EMAIL = "uptimeunicorn@gmail.com";
+
 const students = [
   { number: "S00481", name: "Amara Okonkwo", grade: 11 },
   { number: "S00482", name: "Daniel Tremblay", grade: 11 },
@@ -115,6 +132,7 @@ for (const student of students) {
     studentNumber: student.number,
     name: student.name,
     grade: student.grade,
+    parentEmail: DEMO_PARENT_EMAIL,
   });
   console.log(`  ${wrote ? "+" : "="} ${student.number} ${student.name}`);
 }

@@ -223,6 +223,97 @@ export const routes = [
  */
 export type RouteName = (typeof routes)[number]["name"];
 
+// ---------------------------------------------------------------------------
+// Consumers: Lambdas that nothing calls over HTTP.
+//
+// This is the exception .claude/rules/handlers.md names in as many words - "a
+// non-HTTP trigger - is a deliberate, commented exception, not a quiet one" -
+// so here is the comment.
+//
+// A stream consumer cannot be a Route, and the reasons are structural rather
+// than stylistic. `method` is a closed union of HTTP verbs with no null member;
+// `path` is dereferenced unguarded by byStaticSegmentsFirst and interpolated
+// into an API Gateway route key; `auth: "public"` would be a lie that reads as
+// "anyone on the internet can invoke this"; and local/app.ts types its handler
+// map as Record<RouteName, Handler>, so a DynamoDBStreamEvent handler would not
+// compile. Forcing one in mints an API Gateway route and an invoke permission
+// for a function that must have neither.
+//
+// So: a second list, in the same file. routes.ts stays the one place endpoints
+// and functions are declared, the HTTP loop in local/app.ts never sees these,
+// and everything that is genuinely shared - the bundle, the env-var parity
+// check, the log group, the role - is reused rather than reimplemented.
+// ---------------------------------------------------------------------------
+
+export type Consumer = {
+  /** Lambda name, log group, zip file and IAM role, exactly as for a route. */
+  readonly name: string;
+
+  /** Source file, relative to backend/. Read by build-handlers.ts and Terraform. */
+  readonly entry: string;
+
+  /**
+   * What invokes it. One value today; it exists so the Terraform can switch on
+   * something meaningful rather than assuming every consumer is a table stream.
+   */
+  readonly source: "table-stream";
+
+  /**
+   * Partition prefix the event source mapping filters on, so a consumer is only
+   * woken by records it cares about.
+   *
+   * Here rather than as a literal in consumers.tf so a test can pin it to the
+   * key builder it has to agree with. Rename the prefix in booking/keys.ts and
+   * the filter goes deaf - the consumer stops being invoked at all, no error
+   * anywhere, and every other test stays green.
+   */
+  readonly keyPrefix: string;
+
+  /**
+   * Least-privilege table access, same enum and same meaning as on a Route.
+   * Stream *read* permission is implied by `source` and granted separately - it
+   * is a grant on the stream ARN, not on the table, and conflating the two is
+   * how a consumer ends up able to write rows it only ever needed to read.
+   */
+  readonly access: "none" | "read" | "readwrite";
+
+  /**
+   * Every environment variable the handler reads, transitively. Checked by the
+   * same parity test that checks routes - the mechanism cares about the entry
+   * point, not about what triggers it.
+   */
+  readonly env: readonly string[];
+
+  /** Seconds. */
+  readonly timeout: number;
+
+  /** Records per invocation. Small: a batch is one evening's bookings at most. */
+  readonly batchSize: number;
+};
+
+export const consumers = [
+  {
+    name: "booking-email",
+    entry: "src/consumers/booking-email.ts",
+    source: "table-stream",
+    // Must equal bookingPk(""). routes.ts stays pure data, so the tie to
+    // keys.ts is asserted in a test rather than imported here.
+    keyPrefix: "BOOKING#",
+    // Reads the student profile for the parent's address, and writes the
+    // send-once marker that keeps a retried batch from mailing twice.
+    access: "readwrite",
+    // No ALLOWED_ORIGINS, and that absence is the signal: every helper in
+    // handlers/http.ts takes an ApiEvent so it can read the Origin header, and
+    // this handler has no request, no origin and no response.
+    env: ["SES_FROM_ADDRESS", "SITE_BASE_URL", "TABLE_NAME"],
+    timeout: 30,
+    batchSize: 10,
+  },
+] as const satisfies readonly Consumer[];
+
+/** The union of consumer names, for the same reason RouteName exists. */
+export type ConsumerName = (typeof consumers)[number]["name"];
+
 /** API Gateway `{id}` to Express `:id`. Derived, never hand-written. */
 export function toExpressPath(path: string): string {
   return path.replace(/\{(\w+)\}/g, ":$1");

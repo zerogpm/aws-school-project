@@ -66,8 +66,15 @@ export async function createTables() {
   for (const table of tables) {
     const name = table.TableName!;
 
+    // Idempotent by existence, not by shape. A table already in the volume is
+    // left exactly as it was created, so a change to src/schema.ts - a new
+    // index, or the stream episode 05 added - does not reach it and nothing
+    // says so. The symptom is a local table that behaves like last week's.
+    //
+    // ./app.sh --stop --wipe drops the volume and rebuilds from the current
+    // schema. Said out loud here rather than left to be rediscovered.
     if (await tableExists(name)) {
-      console.log(`  = ${name} already exists`);
+      console.log(`  = ${name} already exists (shape not checked - --wipe to rebuild)`);
       continue;
     }
 

@@ -45,4 +45,16 @@ process.env.MEDIA_BASE_URL ||= "http://127.0.0.1:5173";
 process.env.ALLOWED_ORIGINS ||=
   "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173";
 
+// Read by src/mail.ts. Nothing local sends mail - there is no local SES and no
+// seam for one, and no local event source mapping to invoke the consumer in the
+// first place - so these exist to keep an import of the handler from throwing,
+// not to make sending work.
+//
+// A .test address on purpose. If something ever did reach SES with this, it
+// should fail rather than arrive somewhere real.
+process.env.SES_FROM_ADDRESS ||= "interviews@school.test";
+
+// The site the confirmation links back to. Locally that is the vite dev server.
+process.env.SITE_BASE_URL ||= "http://127.0.0.1:5173";
+
 process.env.PORT ||= "3000";

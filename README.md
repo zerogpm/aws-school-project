@@ -158,7 +158,10 @@ recoloured but never restyled past a centered card, and the site has a design.
 **API + compute** — API Gateway HTTP API → Lambda → DynamoDB on-demand. Public
 routes throttled, with student-number format validation.
 
-**Async** — DynamoDB Streams → Lambda → SES for booking confirmations.
+**Async** — DynamoDB Streams → Lambda → SES for booking confirmations. The
+stream filters on the booking partition, so three of the four items a booking
+writes never cost an invocation, and a send-once marker turns the stream's
+at-least-once record delivery into exactly-once mail.
 
 **Guardrails** — this is the entire monitoring story: an AWS Budgets alarm to
 email, a Route53 health check to SNS email, and DynamoDB point-in-time recovery.
@@ -190,7 +193,7 @@ decision forces the next.
 | [`02-auth`](02-auth/) | Cognito user pool, staff-only accounts, custom sign-in form, custom domain | Built |
 | [`03-data`](03-data/) | Single-table DynamoDB design, API Gateway, Lambda — and one copy of the handler code that also runs locally under Express | Built |
 | [`04-booking`](04-booking/) | Conditional writes, the double-booking demo | Built |
-| [`05-email`](05-email/) | Table stream → Lambda → SES booking confirmations | Not started |
+| [`05-email`](05-email/) | Table stream → Lambda → SES booking confirmations | Built, not yet applied |
 | [`06-cost`](06-cost/) | Budgets alarm, health check, PITR — **and the complete system** | Not started |
 
 ## Layout

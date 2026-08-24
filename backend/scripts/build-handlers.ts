@@ -10,31 +10,69 @@ import { build } from "esbuild";
 import { rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { routes } from "../src/routes.js";
+import { consumers, routes } from "../src/routes.js";
 
 const backendDir = fileURLToPath(new URL("..", import.meta.url));
 const distDir = resolve(backendDir, "dist");
 
+// The runtime already ships the DynamoDB and S3 clients. Bundling those would
+// add megabytes to every zip and seconds to every cold start, for a version the
+// runtime would otherwise keep patched.
+const RUNTIME_PROVIDED = [
+  "@aws-sdk/client-dynamodb",
+  "@aws-sdk/lib-dynamodb",
+  "@aws-sdk/util-dynamodb",
+  "@aws-sdk/client-s3",
+  "@aws-sdk/s3-presigned-post",
+];
+
+// Everything else gets bundled, and the SES client is the reason this list is
+// spelled out rather than left as the "@aws-sdk/*" wildcard it used to be.
+// Which clients a managed runtime provides is a moving target, and an external
+// that turns out not to be there fails at import on the first real invocation -
+// after the apply, on camera, with a stack trace about a missing module rather
+// than about anything you changed. Bundling it costs a few hundred kilobytes.
+const targets = [
+  ...routes.map((route) => ({ name: route.name, entry: route.entry })),
+  ...consumers.map((consumer) => ({ name: consumer.name, entry: consumer.entry })),
+];
+
 await rm(distDir, { recursive: true, force: true });
 
-for (const route of routes) {
+for (const target of targets) {
   await build({
-    entryPoints: [resolve(backendDir, route.entry)],
+    entryPoints: [resolve(backendDir, target.entry)],
 
     // index.mjs, so the nodejs22.x runtime loads it as an ES module without a
     // package.json travelling in the zip. The Terraform sets handler
     // "index.handler", which has to match `export const handler`.
-    outfile: resolve(distDir, route.name, "index.mjs"),
+    outfile: resolve(distDir, target.name, "index.mjs"),
 
     bundle: true,
     platform: "node",
     target: "node22",
     format: "esm",
 
-    // The runtime already ships AWS SDK v3. Bundling it would add megabytes to
-    // every zip and seconds to every cold start, for a version the runtime
-    // would otherwise keep patched.
-    external: ["@aws-sdk/*"],
+    external: RUNTIME_PROVIDED,
+
+    // Gives the ESM bundle a real `require`.
+    //
+    // The AWS SDK is CommonJS. Bundling it into `format: "esm"` makes esbuild
+    // emit a `__require` shim, and that shim throws `Dynamic require of
+    // "node:https" is not supported` the moment the SDK reaches for a Node
+    // builtin - at module load, before the handler runs, so the whole function
+    // is dead and the log says nothing about SES.
+    //
+    // Only bundled dependencies can hit this, which is why eleven route
+    // handlers were fine: everything they import is in RUNTIME_PROVIDED and
+    // never gets bundled at all. The consumer is the first function here to
+    // bundle a CJS dependency, so it is the first to need this.
+    banner: {
+      js: [
+        "import { createRequire as __nodeCreateRequire } from 'node:module';",
+        "const require = __nodeCreateRequire(import.meta.url);",
+      ].join("\n"),
+    },
 
     minify: true,
 
@@ -44,7 +82,9 @@ for (const route of routes) {
     sourcemap: false,
   });
 
-  console.log(`  + ${route.name}`);
+  console.log(`  + ${target.name}`);
 }
 
-console.log(`==> bundled ${routes.length} handlers into backend/dist`);
+console.log(
+  `==> bundled ${routes.length} handlers and ${consumers.length} consumers into backend/dist`,
+);

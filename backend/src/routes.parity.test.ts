@@ -11,8 +11,10 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { ROUTES_JSON, serialiseRoutes } from "../scripts/emit-routes.js";
-import { routes } from "./routes.js";
+import { CONSUMERS_JSON, ROUTES_JSON, serialiseConsumers, serialiseRoutes } from "../scripts/emit-routes.js";
+import { consumers, routes } from "./routes.js";
+import { bookingPk } from "./booking/keys.js";
+import { tables } from "./schema.js";
 
 const read = (relative: string) =>
   readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8");
@@ -20,6 +22,8 @@ const read = (relative: string) =>
 const buildTf = read("../../modules/booking/build.tf");
 const lambdaTf = read("../../modules/booking/lambda.tf");
 const apiTf = read("../../modules/booking/api.tf");
+const consumersTf = read("../../modules/booking/consumers.tf");
+const tableTf = read("../../modules/booking/table.tf");
 const cloudfrontTf = read("../../modules/static-site/cloudfront.tf");
 
 /**
@@ -33,25 +37,46 @@ const cloudfrontTf = read("../../modules/static-site/cloudfront.tf");
  */
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 
-const staffStages = readdirSync(repoRoot, { withFileTypes: true })
+const stageDirs = readdirSync(repoRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && /^\d\d-/.test(entry.name))
   .map((entry) => entry.name)
-  .filter((stage) => existsSync(join(repoRoot, stage, "staff.tf")))
   .sort();
 
 /**
- * The same file with comments removed.
+ * Stages that create the table, and therefore have to put rows in it.
  *
- * These assertions are about what the configuration *does*, and the comments
- * here discuss the very things being asserted absent - "not an
- * aws_cognito_user", "cannot call terraform output". Matching raw text made
- * both tests fail on their own explanation.
+ * `terraform destroy` deletes the table, so a stage that creates one and does
+ * not seed it produces a booking page saying "not open yet" on every single
+ * apply. 03 and 04 shipped that way and it was rediscovered once per recording.
+ *
+ * Discovered rather than listed, for the same reason staffStages is: this is a
+ * repo of cumulative stages, so anything true of one stage is usually true of
+ * the next one somebody adds.
  */
-const staffCodeFor = (stage: string) =>
-  read(`../../${stage}/staff.tf`)
+const tableStages = stageDirs.filter((stage) =>
+  existsSync(join(repoRoot, stage, "main.tf")) &&
+  readFileSync(join(repoRoot, stage, "main.tf"), "utf8").includes('source = "../modules/booking"'),
+);
+
+const staffStages = stageDirs.filter((stage) => existsSync(join(repoRoot, stage, "staff.tf")));
+
+/**
+ * A .tf file with its comments removed.
+ *
+ * These assertions are about what the configuration *does*, and the comments in
+ * these files discuss the very things being asserted absent - "not an
+ * aws_cognito_user", "No logs:CreateLogGroup", "TRIM_HORIZON on a replaced
+ * mapping". Matching raw text makes a file fail on its own explanation.
+ */
+const withoutComments = (tf: string): string =>
+  tf
     .split(/\r?\n/)
     .filter((line) => !line.trim().startsWith("#"))
     .join("\n");
+
+const consumersCode = withoutComments(consumersTf);
+
+const staffCodeFor = (stage: string) => withoutComments(read(`../../${stage}/staff.tf`));
 
 describe("routes.json", () => {
   it("is current", () => {
@@ -63,6 +88,32 @@ describe("routes.json", () => {
 
   it("is what Terraform actually reads", () => {
     expect(buildTf).toContain('jsondecode(file("${local.backend_dir}/routes.json"))');
+  });
+});
+
+describe("consumers.json", () => {
+  it("is current", () => {
+    expect(readFileSync(CONSUMERS_JSON, "utf8")).toBe(serialiseConsumers());
+  });
+
+  it("is what Terraform actually reads", () => {
+    expect(buildTf).toContain('jsondecode(file("${local.backend_dir}/consumers.json"))');
+  });
+
+  it("retriggers the bundle when it changes", () => {
+    // source_hash covers src/**/*.ts and both manifests. Miss this and editing
+    // only the manifest ships yesterday's zip against today's configuration.
+    expect(buildTf).toContain('filesha256("${local.backend_dir}/consumers.json")');
+  });
+
+  it("names nothing that is also an HTTP route", () => {
+    // The two lists key separate Terraform resources. A name in both would
+    // collide on the function name, the log group and the role.
+    // string[], not the literal union `routes` infers - the whole point is to
+    // compare names across the two lists, which tsc would otherwise call a
+    // mistake precisely because they are meant to be disjoint today.
+    const routeNames: string[] = routes.map((route) => route.name);
+    expect(consumers.filter((consumer) => routeNames.includes(consumer.name))).toEqual([]);
   });
 });
 
@@ -81,7 +132,10 @@ describe("environment variables", () => {
     return readEnvNames();
   };
 
-  for (const route of routes) {
+  // Routes and consumers together. The mechanism cares about an entry point,
+  // not about what triggers it - a stream consumer reading an undeclared
+  // variable is the same defect as a handler doing it, and fails the same way.
+  for (const route of [...routes, ...consumers]) {
     it(`${route.name} declares every variable it reads, transitively`, async () => {
       const read = await namesReadBy(route.entry);
       const declared: readonly string[] = route.env;
@@ -102,7 +156,7 @@ describe("environment variables", () => {
     });
   }
 
-  it("Terraform knows a value for every name any route declares", () => {
+  it("Terraform knows a value for every name any route or consumer declares", () => {
     // local.env_values is a map, and the lookup is not defaulted, so a route
     // naming something absent from it fails the plan with the key in the
     // message. This test says the same thing one step earlier and without
@@ -110,7 +164,9 @@ describe("environment variables", () => {
     const block = lambdaTf.match(/env_values = \{([\s\S]*?)\n {2}\}/)?.[1] ?? "";
     const known = [...block.matchAll(/^\s*([A-Z0-9_]+)\s*=/gm)].map((m) => m[1]);
 
-    const declared = [...new Set(routes.flatMap((route) => [...route.env]))];
+    const declared = [
+      ...new Set([...routes, ...consumers].flatMap((entry) => [...entry.env])),
+    ];
     expect(declared.filter((name) => !known.includes(name))).toEqual([]);
   });
 
@@ -315,5 +371,122 @@ describe("log groups", () => {
 
   it("does not grant CreateLogGroup, which would recreate one after a destroy", () => {
     expect(lambdaTf).not.toContain("logs:CreateLogGroup");
+  });
+});
+
+describe("the table stream", () => {
+  it("is on, and carries both images", () => {
+    expect(tableTf).toContain("stream_enabled   = var.stream_enabled");
+    expect(tableTf).toContain('"NEW_AND_OLD_IMAGES"');
+  });
+
+  it("is mirrored by the local schema, which nothing else keeps in sync", () => {
+    // table.tf says outright that nothing keeps the two in sync. This is the
+    // part where drift is silent: a NEW_IMAGE local table and a
+    // NEW_AND_OLD_IMAGES deployed one pass every other test identically, and
+    // the difference only shows up as a cancellation email with no recipient.
+    expect(tables[0].StreamSpecification).toEqual({
+      StreamEnabled: true,
+      StreamViewType: "NEW_AND_OLD_IMAGES",
+    });
+  });
+});
+
+describe("the stream consumer", () => {
+  it("is not reachable over HTTP, by construction", () => {
+    // The assertion that encodes the whole design decision. An event source
+    // mapping pulls, using the function's own execution role, so a resource
+    // policy here would be cargo cult - and an API Gateway route would be a
+    // public URL onto a function nobody should be able to call.
+    expect(consumersCode).not.toContain("aws_lambda_permission");
+    expect(consumersCode).not.toContain("aws_apigatewayv2");
+  });
+
+  it("starts at LATEST, so a replacement does not re-mail the school", () => {
+    // TRIM_HORIZON on a replaced mapping re-reads up to 24 hours of stream and
+    // sends a confirmation for every booking in it.
+    expect(consumersCode).toContain('starting_position = "LATEST"');
+    expect(consumersCode).not.toContain("TRIM_HORIZON");
+  });
+
+  it("reports individual record failures rather than failing the batch", () => {
+    expect(consumersCode).toContain('function_response_types = ["ReportBatchItemFailures"]');
+  });
+
+  it("bounds its retries and isolates a poison record", () => {
+    // The default is retry-until-expiry, which is 24 hours of one bad record
+    // blocking the shard while every confirmation behind it waits.
+    expect(consumersTf).toContain("maximum_retry_attempts         = 3");
+    expect(consumersTf).toContain("bisect_batch_on_function_error = true");
+  });
+
+  it("builds its filter from the manifest rather than a second copy of the prefix", () => {
+    expect(consumersCode).toContain("each.value.keyPrefix");
+    expect(consumersCode).not.toContain('prefix = "BOOKING#"');
+  });
+
+  it("filters on the key prefix the key builder actually produces", () => {
+    // Rename the prefix in booking/keys.ts and the filter goes deaf: the
+    // consumer simply stops being invoked, with no error anywhere and every
+    // other test still green.
+    for (const consumer of consumers) {
+      expect(consumer.keyPrefix, consumer.name).toBe(bookingPk(""));
+    }
+  });
+
+  it("scopes stream reads to the stream, and ListStreams to nothing", () => {
+    // ListStreams enumerates, so it cannot be resource-scoped. Naming the
+    // stream ARN there is the plausible-looking mistake, and it leaves the
+    // mapping stuck in Creating with a message that never mentions the line.
+    expect(consumersTf).toContain("resources = [aws_dynamodb_table.school.stream_arn]");
+    expect(consumersTf).toContain('actions   = ["dynamodb:ListStreams"]');
+    expect(consumersTf).toContain('resources = ["*"]');
+  });
+
+  it("waits for its own stream grant before creating the mapping", () => {
+    // Terraform cannot infer this: the mapping references the stream and the
+    // function, never the policy. Without it the first apply fails on
+    // permissions and the second succeeds.
+    expect(consumersTf).toContain("depends_on = [aws_iam_role_policy.consumer_stream]");
+  });
+
+  it("creates its log group explicitly, with retention", () => {
+    expect(consumersCode).toContain('resource "aws_cloudwatch_log_group" "consumer"');
+    expect(consumersCode).toContain("retention_in_days = var.log_retention_days");
+    expect(consumersCode).not.toContain("logs:CreateLogGroup");
+  });
+
+  it("passes each consumer only the variables it declared", () => {
+    expect(consumersTf).toContain("for key in each.value.env : key => local.env_values[key]");
+  });
+
+  it("creates nothing at all until a stage wires an identity to send through", () => {
+    // 03 and 04 call this same module. Without the gate they would demand an
+    // SES identity they have no reason to own.
+    expect(consumersCode).toContain("notify = var.email_enabled");
+    expect(buildTf).toContain("local.notify ?");
+  });
+});
+
+describe("seeding a deployed stage", () => {
+  it("is needed by at least one stage, or the case below proves nothing", () => {
+    expect(tableStages).not.toHaveLength(0);
+  });
+
+  it.each(tableStages)("%s seeds the table it creates", (stage) => {
+    // Without this the stage applies to an empty table and the booking page
+    // says "not open yet" - correctly, and confusingly, because nothing looks
+    // broken. It cost a recording before anyone connected the two.
+    expect(existsSync(join(repoRoot, stage, "seed.tf")), `${stage} has no seed.tf`).toBe(true);
+  });
+
+  it.each(tableStages)("%s keeps the seeded rows out of Terraform state", (stage) => {
+    // The reason seeding was left out originally, and still the constraint: a
+    // student as an aws_dynamodb_table_item means `terraform destroy` deletes
+    // the school roll. The provisioner shells out instead, exactly as staff.tf
+    // does for the demo account.
+    const seedTf = withoutComments(readFileSync(join(repoRoot, stage, "seed.tf"), "utf8"));
+    expect(seedTf).toContain("local-exec");
+    expect(seedTf).not.toContain("aws_dynamodb_table_item");
   });
 });

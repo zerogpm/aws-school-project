@@ -62,6 +62,29 @@ Three bug classes are structurally impossible rather than merely tested for:
 After editing `routes.ts`: `npm run routes:emit`. Forgetting fails
 `src/routes.parity.test.ts`, not the deploy.
 
+## One consumer list
+
+`backend/src/routes.ts` also exports `consumers` — Lambdas nothing calls over
+HTTP. There is one, `booking-email`, and a DynamoDB stream wakes it.
+
+It is a second array rather than a row in `routes` because a stream consumer is
+not an endpoint and pretending otherwise breaks four things: `method` is a closed
+union of HTTP verbs, `path` is dereferenced unguarded when sorting routes,
+`auth: "public"` would read as "anyone on the internet can call this", and
+`local/app.ts` types its map as `Record<RouteName, Handler>` — a
+`DynamoDBStreamEvent` handler does not compile as one.
+
+`.claude/rules/handlers.md` sanctions exactly this: *"a non-HTTP trigger — is a
+deliberate, commented exception, not a quiet one."* The comment is at the top of
+the `consumers` array.
+
+Everything genuinely shared is reused. `npm run routes:emit` writes both
+manifests, `build:handlers` bundles both, and the env-var parity check runs over
+both — the mechanism cares about an entry point, not about what triggers it.
+
+The local Express server never loads it. `createApp()` iterates `routes` only,
+so the consumer has no local route and nothing to register.
+
 ## Environment variables are the dangerous seam
 
 Deployed, a function receives only what its own Terraform block declares.
@@ -92,6 +115,8 @@ Each of these has produced a production-only incident somewhere.
 | Isolation | one process, shared module state | many containers, per-container state |
 | Authorizer | mocked, always valid | validates and returns 401 itself |
 | Retries | none | async invocations retry |
+| Stream triggers | the table has a stream; nothing delivers it | Streams to an event source mapping, with filtering, batching and partial-batch reporting |
+| Sending mail | none - SES has no local equivalent | SES, and only to verified addresses until the account leaves the sandbox |
 
 Token expiry and 401-refresh flows are not testable here. Test them against a
 deployed stage.

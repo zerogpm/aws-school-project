@@ -14,6 +14,13 @@ export default defineConfig({
       MEDIA_BUCKET: "local-media",
       MEDIA_BASE_URL: "https://cdn.test",
       ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173",
+
+      // Read by src/mail.ts at module load, so without these every test that
+      // imports the booking-email handler throws before its first assertion.
+      // A .test address, never a real one: nothing here sends, but a typo that
+      // reached SES should fail rather than reach a person.
+      SES_FROM_ADDRESS: "interviews@school.test",
+      SITE_BASE_URL: "https://school.test",
     },
   },
 });

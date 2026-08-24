@@ -69,6 +69,20 @@ const windows = [
 //
 //   S00481-S00484   site/e2e/api.spec.ts, and anything done by hand
 //   S00485-S00488   site/e2e/site.spec.ts, the browser suite
+// Every student's parent is the same inbox, on purpose.
+//
+// This is a demo school. There is no parent contact list and there is not going
+// to be one - the point is to show a real message arriving from a real booking,
+// and one verified address does that for any student you happen to pick on
+// camera. It also keeps the SES sandbox happy: until production access lands,
+// SES will only deliver to addresses that have been verified, and this is the
+// one that has.
+//
+// Kept identical in backend/local/seed.ts and backend/scripts/seed-aws.ts - one
+// for the container, one for a deployed table. If it drifts you find out
+// immediately, because the mail stops arriving.
+const DEMO_PARENT_EMAIL = "uptimeunicorn@gmail.com";
+
 const students = [
   { number: "S00481", name: "Amara Okonkwo", grade: 11 },
   { number: "S00482", name: "Daniel Tremblay", grade: 11 },
@@ -116,6 +130,7 @@ export async function seed(): Promise<void> {
         studentNumber: student.number,
         name: student.name,
         grade: student.grade,
+        parentEmail: DEMO_PARENT_EMAIL,
       },
       `student ${student.number}`,
     );

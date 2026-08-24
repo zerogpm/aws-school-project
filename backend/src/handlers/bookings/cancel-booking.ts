@@ -130,8 +130,15 @@ export const handler = async (event: ApiEvent): Promise<ApiResult> => {
       }),
     );
 
-    // The slot's REMOVE is what episode 05's stream will watch to send the
-    // cancellation email. Nothing here emails anyone yet.
+    // The booking's own Delete above - TransactItems[3] - is what the stream
+    // consumer watches, not the slot's REMOVE.
+    //
+    // That was the original guess and it was wrong. The slot carries a student
+    // number and no address, so mailing from it would mean a second read to
+    // find out who to tell. The booking item carries everything, and both
+    // events land on it: INSERT when it is made, REMOVE when it is cancelled.
+    // Its old image is where parentEmail survives, which is why the table is
+    // NEW_AND_OLD_IMAGES. See backend/src/consumers/booking-email.ts.
     return ok(event, { bookingRef: ref, windowId, slotId, cancelled: true });
   } catch (error) {
     if (error instanceof TransactionCanceledException) {

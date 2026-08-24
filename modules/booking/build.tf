@@ -17,12 +17,24 @@ locals {
     route.name => route
   }
 
+  # The non-HTTP half of the manifest, and empty unless this stage asked for it.
+  # Gated rather than unconditional because 03 and 04 call this module too and
+  # have no SES identity to send through - an ungated consumer would fail their
+  # plan on a variable they have no reason to set.
+  consumers = local.notify ? {
+    for consumer in jsondecode(file("${local.backend_dir}/consumers.json")) :
+    consumer.name => consumer
+  } : {}
+
   # Any change to a handler, a helper it imports, or the manifest itself means
   # a rebuild. Hashing the whole tree over-triggers on a test-only edit, which
   # costs one wasted esbuild run - the opposite mistake ships a stale bundle.
   source_hash = sha256(join("", concat(
     [for f in fileset("${local.backend_dir}/src", "**/*.ts") : filesha256("${local.backend_dir}/src/${f}")],
-    [filesha256("${local.backend_dir}/routes.json")],
+    [
+      filesha256("${local.backend_dir}/routes.json"),
+      filesha256("${local.backend_dir}/consumers.json"),
+    ],
   )))
 }
 
@@ -48,6 +60,18 @@ resource "terraform_data" "bundle" {
 # directory that does not exist yet.
 data "archive_file" "handler" {
   for_each = local.routes
+
+  type        = "zip"
+  source_dir  = "${local.backend_dir}/dist/${each.key}"
+  output_path = "${local.backend_dir}/dist/${each.key}.zip"
+
+  depends_on = [terraform_data.bundle]
+}
+
+# The consumer's bundle. Same shape and the same depends_on reasoning as the
+# handler archive above; a separate block only because for_each keys differ.
+data "archive_file" "consumer" {
+  for_each = local.consumers
 
   type        = "zip"
   source_dir  = "${local.backend_dir}/dist/${each.key}"

@@ -53,7 +53,9 @@ partway through an apply.
   invite.
 - **Cognito's built-in email sender is capped at 50 messages a day**, under the
   sixty invites a full staff onboarding needs. `ses_source_arn` is the way out;
-  SES itself arrives in `05-email`.
+  SES itself arrives in `05-email`, which creates the identity and can pass it
+  here - gated, because sending through a sandboxed SES reaches fewer people
+  than Cognito's own sender, not more.
 - **No SMS anywhere** — not for MFA, not for recovery. It needs an SNS caller
   role, bills per message, and would mean holding staff phone numbers.
 - The app client has no secret. It is a browser app, and a secret in a JS bundle

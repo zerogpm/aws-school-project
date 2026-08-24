@@ -23,6 +23,45 @@ The alternative — two hand-maintained lists — produces exactly one of two bu
 Local-only: works all through development, then 404s in production. IaC-only:
 deployed and reachable, and its first real traffic is production traffic.
 
+## The Lambda nothing calls
+
+`consumers.tf` creates one function per entry in `backend/consumers.json`, the
+non-HTTP half of the same manifest. Today there is one: `booking-email`, woken
+by the table's own stream.
+
+It is a parallel of `lambda.tf` rather than an extension of it. Those resources
+are keyed `for_each = local.routes` and `routes.parity.test.ts` asserts those
+expressions by string, so widening them would break the assertions that make the
+route half trustworthy.
+
+Two absences carry the lesson:
+
+- **No `aws_apigatewayv2_*`.** There is no URL. Nothing routes to it.
+- **No `aws_lambda_permission`.** API Gateway *pushes*, so it needs a resource
+  policy naming it as an allowed caller. An event source mapping *pulls*, using
+  the function's own execution role — so authorisation lives in the role, and a
+  resource policy here would be cargo cult. A parity test asserts it stays
+  absent.
+
+The whole block evaporates unless a stage passes an SES identity, which is why
+`03-data` and `04-booking` can call this module unchanged.
+
+Settings that are not defaults, and why:
+
+| | |
+| --- | --- |
+| `starting_position = "LATEST"` | `TRIM_HORIZON` on a replaced mapping re-reads a day of stream and re-confirms every booking in it |
+| `filter_criteria` on the `BOOKING#` prefix | one booking writes four items; three of them carry no address and should not cost an invocation |
+| `maximum_retry_attempts = 3` | the default is retry-until-expiry — 24 hours of one poison record blocking the shard |
+| `bisect_batch_on_function_error` | isolates that record instead of failing its neighbours with it |
+| `ReportBatchItemFailures` | lets the handler name which records failed |
+| `maximum_batching_window_in_seconds` | a cost control: the poller would otherwise call `GetRecords` several times a second, all year, against a table idle most of it |
+| `depends_on` the stream policy | the mapping references the stream and the function, never the policy, so it otherwise races its own IAM grant |
+
+`dynamodb:ListStreams` is granted on `"*"` — it enumerates, so there is nothing
+to scope it to, and naming the stream ARN leaves the mapping stuck in `Creating`
+with a message that never mentions the line.
+
 ## Environment variables are the dangerous part
 
 Deployed, each function receives only what its own `environment` block declares.

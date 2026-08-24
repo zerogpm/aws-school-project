@@ -9,6 +9,11 @@ project_name = "school"
 # Custom domain. Leave both unset to keep the *.cloudfront.net name and create
 # no Route53 or ACM resources at all.
 #
+# From this stage on they do more than name the site: SES verifies the SENDER by
+# writing DKIM records into the hosted zone, so with no domain there is no
+# identity, and modules/booking creates no email consumer at all. The rest of
+# the stack still applies - it is the stack minus the episode.
+#
 # A subdomain of a zone you already own costs nothing extra - a new hosted zone
 # is $0.50/month. The certificate is free, and lives in us-east-1 because
 # CloudFront accepts one from nowhere else.
@@ -21,3 +26,23 @@ project_name = "school"
 # a temporary one and forces a change at first sign-in.
 # demo_staff_email    = "you@example.com"
 # demo_staff_password = "Str0ng!DemoPassw0rd"
+
+# Addresses to verify as SES RECIPIENTS.
+#
+# The part of the sandbox that surprises people: verifying the domain above
+# authorises the sender and says nothing about who may receive. Until this region
+# has production access, SES accepts a message to an unverified address and
+# delivers it nowhere - silently.
+#
+# Each address here gets a link from AWS that a human clicks once. Defaults to
+# the demo inbox; empty it once production access lands.
+# verified_recipients = ["someone@example.com"]
+
+# Send Cognito's staff email through SES too.
+#
+# Leave false until this region has SES production access. Cognito's own sender
+# is capped at 50 a day but reaches anyone; SES in the sandbox is uncapped but
+# reaches only verified addresses, which sixty staff accounts are not. Turning
+# this on early takes staff invites from limited to impossible, and fails this
+# stage's apply at the demo-staff script.
+# cognito_email_via_ses = true

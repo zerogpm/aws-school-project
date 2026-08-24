@@ -228,11 +228,16 @@ formatting them.
 
 ```
 ./app.sh --start                                  # local: students, windows, 72 slots
-cd backend && npm run seed:aws -- --table $(terraform -chdir=../04-booking output -raw table_name)
+./scripts/seed-stage.sh 04-booking                # deployed, by hand
 ```
 
-The local stack seeds on every boot; a deployed stage seeds nothing, which is
-why a fresh apply shows "Booking for this evening is not open yet". Add
+Both runtimes seed themselves now. The local stack seeds on every boot, and
+`seed.tf` seeds a deployed stage during the apply — `terraform destroy` deletes
+the table, so without that every cycle began with "Booking for this evening is
+not open yet" and a manual step. Set `seed_demo_data = false` for a real
+deployment, which wants a real roll rather than four fictional students.
+
+The command above is still there for seeding a table that already exists. Add
 `--dry-run` to see what would be written. Every write is conditional, so
 re-running never overwrites a booking made while testing.
 

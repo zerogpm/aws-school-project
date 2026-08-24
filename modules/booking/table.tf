@@ -62,6 +62,16 @@ resource "aws_dynamodb_table" "school" {
     projection_type = "ALL"
   }
 
+  # The stream episode 05 reads. NEW_AND_OLD_IMAGES is not a preference: a
+  # cancellation DELETEs the BOOKING#<ref>/META item, so the parent's address
+  # exists only in the old image. Under NEW_IMAGE a cancellation arrives as keys
+  # and nothing else, and there is nobody left to email.
+  #
+  # Turning it on costs nothing by itself - a stream is billed on reads, and
+  # only the consumer in consumers.tf reads it.
+  stream_enabled   = var.stream_enabled
+  stream_view_type = var.stream_enabled ? "NEW_AND_OLD_IMAGES" : null
+
   point_in_time_recovery {
     enabled = var.point_in_time_recovery
   }

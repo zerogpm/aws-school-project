@@ -12,6 +12,35 @@ locals {
   # sends the browser back there with ?code=, and the SPA exchanges it. No extra
   # route, and no server to host one on.
   staff_url = "${local.site_url}/staff"
+
+  # Empty when no domain is configured, which is what every reference below
+  # then sees. modules/booking treats an empty identity as "no consumer at all",
+  # so a stage applied without a domain is the stack minus the email - not a
+  # broken stack.
+  ses_identity_arn          = try(module.email[0].identity_arn, "")
+  ses_identity_arns         = try(module.email[0].identity_arns, [])
+  ses_from_address          = try(module.email[0].from_address, "")
+  ses_configuration_set_arn = try(module.email[0].configuration_set_arn, "")
+}
+
+# ---------------------------------------------------------------------------
+# The episode.
+#
+# Counted rather than unconditional: SES verification here is DNS, so it needs a
+# hosted zone. With no domain configured this creates nothing and the rest of
+# the stage still applies.
+# ---------------------------------------------------------------------------
+module "email" {
+  source = "../modules/email"
+  count  = var.domain_name != "" ? 1 : 0
+
+  name_prefix      = var.project_name
+  domain_name      = var.domain_name
+  hosted_zone_name = var.hosted_zone_name
+
+  # The sandbox verifies senders and recipients separately, so a demo inbox has
+  # to be named here or the mail is accepted and delivered nowhere.
+  verified_recipients = var.verified_recipients
 }
 
 module "static_site" {
@@ -52,6 +81,18 @@ module "auth" {
     [for origin in var.dev_origins : "${origin}/staff"],
   )
   logout_urls = concat(module.static_site.site_origins, var.dev_origins)
+
+  # The hook 02 left for this stage, behind a switch that starts off.
+  #
+  # Flipping it while the account is still in the SES sandbox makes staff email
+  # worse, not better: Cognito's built-in sender reaches anyone at 50 a day,
+  # and SES in the sandbox reaches only verified addresses - which sixty staff
+  # accounts are not. It would also fail this stage's own apply, because
+  # scripts/create-staff.sh asks Cognito to email the demo account.
+  #
+  # Turn it on once ca-central-1 has production access, and apply again.
+  ses_source_arn         = var.cognito_email_via_ses ? local.ses_identity_arn : ""
+  ses_from_email_address = var.cognito_email_via_ses ? local.ses_from_address : ""
 }
 
 module "booking" {
@@ -86,6 +127,23 @@ module "booking" {
   # it. Taken from the module so a recreated distribution carries the links with
   # it in the same apply.
   media_base_url = module.static_site.site_url
+
+  # Turns on the table stream and, with an identity to send through, creates the
+  # booking-email consumer that reads it. 03 and 04 call this same module and
+  # pass none of these, so they get neither.
+  stream_enabled = true
+
+  # Known at plan time - it is a variable, not a resource attribute. Without a
+  # domain there is no SES identity, so there is nothing for a consumer to send
+  # through and it is correct to create none.
+  email_enabled = var.domain_name != ""
+
+  ses_identity_arns         = local.ses_identity_arns
+  ses_from_address          = local.ses_from_address
+  ses_configuration_set_arn = local.ses_configuration_set_arn
+
+  # Where the confirmation email tells a parent to go to change or cancel.
+  site_base_url = local.site_url
 
   build_handlers = var.build_handlers
 }

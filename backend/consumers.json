@@ -1,0 +1,16 @@
+[
+  {
+    "name": "booking-email",
+    "entry": "src/consumers/booking-email.ts",
+    "source": "table-stream",
+    "keyPrefix": "BOOKING#",
+    "access": "readwrite",
+    "env": [
+      "SES_FROM_ADDRESS",
+      "SITE_BASE_URL",
+      "TABLE_NAME"
+    ],
+    "timeout": 30,
+    "batchSize": 10
+  }
+]

@@ -86,5 +86,20 @@ export const tables: CreateTableCommandInput[] = [
         Projection: { ProjectionType: "ALL" },
       },
     ],
+
+    // Mirrors stream_enabled / stream_view_type in modules/booking/table.tf.
+    //
+    // NEW_AND_OLD_IMAGES rather than NEW_IMAGE, because a cancellation deletes
+    // the BOOKING#<ref>/META item outright - the parent's address survives only
+    // in the old image, and under NEW_IMAGE there would be nobody left to mail.
+    //
+    // DynamoDB Local serves the Streams API, so the table shape is honest here.
+    // What it has no equivalent for is the event source mapping that would
+    // deliver those records to a function, so nothing locally reads this. See
+    // the "What local does not reproduce" table in backend/README.md.
+    StreamSpecification: {
+      StreamEnabled: true,
+      StreamViewType: "NEW_AND_OLD_IMAGES",
+    },
   },
 ];

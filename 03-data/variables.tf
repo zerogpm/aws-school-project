@@ -97,3 +97,21 @@ variable "demo_staff_password" {
   default     = ""
   sensitive   = true
 }
+
+variable "seed_demo_data" {
+  description = <<-EOT
+    Write the four demo students, both interview windows and the whole slot grid
+    after the table is created.
+
+    On by default because this repo's workflow is apply / verify / destroy, and
+    destroy takes the table with it - so without this every apply produces a
+    booking page that correctly says "not open yet" and a demo that cannot
+    start.
+
+    Nothing about the rows reaches Terraform state; the provisioner runs the
+    same seeder a human would. Set false for a real deployment, which wants a
+    real roll loaded by the office rather than four fictional students.
+  EOT
+  type        = bool
+  default     = true
+}

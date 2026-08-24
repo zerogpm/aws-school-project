@@ -12,6 +12,12 @@ locals {
     TABLE_NAME      = aws_dynamodb_table.school.name
     MEDIA_BUCKET    = var.media_bucket_name
     MEDIA_BASE_URL  = var.media_base_url
+
+    # Read by the stream consumer rather than by any route. One shared map for
+    # both function families, so routes.parity.test.ts keeps covering every
+    # declared name with a single assertion.
+    SES_FROM_ADDRESS = var.ses_from_address
+    SITE_BASE_URL    = var.site_base_url
   }
 
   # Staff-uploaded PDFs. modules/static-site scopes its lifecycle by prefix, so

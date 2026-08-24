@@ -96,3 +96,50 @@ variable "point_in_time_recovery" {
   type        = bool
   default     = true
 }
+
+variable "stream_enabled" {
+  description = "DynamoDB stream on the table, which the booking-email consumer reads. Off by default so 03 and 04 - which share this module and predate the stream - see no diff on their next apply. 05 turns it on."
+  type        = bool
+  default     = false
+}
+
+variable "email_enabled" {
+  description = "Create the booking-email consumer. A plain bool, and deliberately not derived from ses_identity_arn: that arrives from an SES resource and is unknown until apply, and a for_each whose KEYS are unknown cannot be planned."
+  type        = bool
+  default     = false
+}
+
+variable "ses_identity_arns" {
+  description = "Every SES identity the send must be authorised against - the sending domain, and each verified recipient, because SES evaluates a recipient that is itself a verified identity as a resource on SendEmail."
+  type        = list(string)
+  default     = []
+}
+
+variable "ses_from_address" {
+  description = "From address on parent confirmations. Must belong to ses_identity_arn."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.ses_from_address == "" || length(var.ses_identity_arns) > 0
+    error_message = "ses_from_address does nothing without ses_identity_arns - there is no identity to send through."
+  }
+}
+
+variable "ses_configuration_set_arn" {
+  description = "SES configuration set attached to the identity, named in the send policy because IAM evaluates it as a second resource on the same call."
+  type        = string
+  default     = ""
+}
+
+variable "stream_batching_window_seconds" {
+  description = "How long the poller waits to fill a batch. Higher is fewer GetRecords calls against a table that is idle most of the year, at the cost of that much delay on a confirmation email."
+  type        = number
+  default     = 5
+}
+
+variable "site_base_url" {
+  description = "Canonical site URL. The confirmation email links back to it so a parent can cancel without hunting for the address."
+  type        = string
+  default     = ""
+}

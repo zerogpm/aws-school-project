@@ -63,10 +63,11 @@ they will fight over state.
 
 Region is `ca-central-1` — data must stay in Canada. Not negotiable.
 
-Current state: episodes 01 through 04 are built — the static site, Cognito, the
+Current state: episodes 01 through 05 are built — the static site, Cognito, the
 single table, an HTTP API, the Lambda handlers with their local Express runtime,
-and the booking transaction. `05-email` and `06-cost` are still placeholder
-READMEs. No CI, by choice.
+the booking transaction, and a table stream feeding a Lambda that mails parents
+through SES. `05-email` is built but has not been applied. `06-cost` is still a
+placeholder README. No CI, by choice.
 
 ## Business Model
 
@@ -98,9 +99,11 @@ interview slots and club/activity spots.
 01-storage/ .. 06-cost/   cumulative episode stages; 06-cost is the full stack
 modules/static-site/      reusable static site infrastructure
 modules/auth/             reusable staff authentication infrastructure
-modules/booking/          table, HTTP API, and one Lambda per route
+modules/booking/          table, HTTP API, one Lambda per route, one per consumer
+modules/email/            SES identity and its DKIM records
 backend/src/handlers/     THE ONLY COPY of the handler code
-backend/src/routes.ts     THE ONLY LIST of endpoints; both runtimes read it
+backend/src/consumers/    Lambdas nothing calls over HTTP. a stream wakes them
+backend/src/routes.ts     THE ONLY LIST of endpoints AND consumers
 backend/local/            the Express wrapper. imports src/, never the reverse
 backend/scripts/          emit routes.json, bundle handlers with esbuild
 site/                     the front end. a prop; keep it minimal
@@ -178,10 +181,14 @@ grades. Each cut is stated on camera with its reason — the cuts are the conten
 AWS access resolves through the standard credential chain (`AWS_PROFILE`,
 `AWS_REGION`, `~/.aws/config`).
 
-Handler variables so far: `TABLE_NAME` and `ALLOWED_ORIGINS`. Locally they are
-set by `backend/local/env.ts` alongside `DYNAMODB_ENDPOINT`, which is the single
-switch that points the SDK at the container; deployed, `DYNAMODB_ENDPOINT` is
-unset and the rest come from `modules/booking/lambda.tf`.
+Handler variables so far: `ALLOWED_ORIGINS`, `TABLE_NAME`, `MEDIA_BUCKET`,
+`MEDIA_BASE_URL`, and — read only by the stream consumer, which has no request
+and therefore no origin — `SES_FROM_ADDRESS` and `SITE_BASE_URL`. Locally they
+are set by `backend/local/env.ts` alongside `DYNAMODB_ENDPOINT`, which is the
+single switch that points the SDK at the container; deployed, `DYNAMODB_ENDPOINT`
+is unset and the rest come from `modules/booking/lambda.tf`. The test suite
+supplies the same names through `backend/vitest.config.ts` — miss one there and
+every test importing that handler throws at module load.
 
 Golden Rule 3 is enforced mechanically and fails loudly at each of three points
 — `requireEnv()` throws at module load, Terraform fails the plan on a name it

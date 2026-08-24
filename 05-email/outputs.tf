@@ -62,3 +62,23 @@ output "function_names" {
   description = "Deployed function name per route, so reading a log group needs no guessing."
   value       = module.booking.function_names
 }
+
+output "ses_from_address" {
+  description = "The address parents see on a confirmation."
+  value       = try(module.email[0].from_address, "")
+}
+
+output "ses_verified_for_sending" {
+  description = "False right after the first apply - DKIM takes minutes. Check this before the first demo booking, or the send is retried three times and dropped."
+  value       = try(module.email[0].verified_for_sending, false)
+}
+
+output "ses_dkim_tokens" {
+  description = "The three DKIM tokens, for confirming the CNAMEs resolved."
+  value       = try(module.email[0].dkim_tokens, [])
+}
+
+output "consumer_function_names" {
+  description = "The stream consumer, for reading its log group without guessing."
+  value       = module.booking.consumer_function_names
+}

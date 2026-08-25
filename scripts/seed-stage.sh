@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Seed a deployed stage's table: students, windows, and the whole slot grid.
 #
-#   ./scripts/seed-stage.sh                    default: 05-email
+#   ./scripts/seed-stage.sh                    default: 06-cost
 #   ./scripts/seed-stage.sh 04-booking
 #   ./scripts/seed-stage.sh --dry-run 05-email
 #
@@ -30,7 +30,7 @@ for arg in "$@"; do
   esac
 done
 
-STAGE="${STAGE:-05-email}"
+STAGE="${STAGE:-06-cost}"
 STAGE_DIR="$ROOT/$STAGE"
 
 if [ ! -d "$STAGE_DIR" ]; then

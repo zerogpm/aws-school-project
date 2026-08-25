@@ -110,6 +110,75 @@ else
   echo "  none"
 fi
 
+# ---------------------------------------------------------------------------
+# The same tag sweep again, in us-east-1.
+#
+# 06 is the first stage to put anything there, and it had no choice: Route53
+# publishes HealthCheckStatus into AWS/Route53 in us-east-1 and nowhere else, so
+# the alarm lives there and its SNS topic has to live beside it. Global services
+# register their tags in us-east-1 as well, which is why README.md has always
+# described teardown as a two-region check while this script did only one.
+# ---------------------------------------------------------------------------
+echo "Tagged Project=$PROJECT in us-east-1"
+if ! use1="$(aws resourcegroupstaggingapi get-resources \
+    --tag-filters "Key=Project,Values=$PROJECT" \
+    --region us-east-1 \
+    --query 'ResourceTagMappingList[].ResourceARN' \
+    --output text 2>&1)"; then
+  printf '  !! could not query us-east-1: %s\n' "$use1"
+  found=1
+elif [ -n "$use1" ]; then
+  for arn in $use1; do note "$arn"; done
+else
+  echo "  none"
+fi
+
+# A budget takes no tags at all - the resource has no tags argument, so
+# default_tags never reaches it and neither sweep above can see one. It is also
+# account-scoped rather than regional, so a destroy that dies early leaves a
+# budget quietly mailing about an account that no longer runs anything.
+echo "Budgets (untaggable, checked by name)"
+if ! account="$(aws sts get-caller-identity --query Account --output text 2>&1)"; then
+  printf '  !! could not resolve account id: %s\n' "$account"
+  found=1
+elif ! budgets="$(aws budgets describe-budgets --account-id "$account" \
+    --query "Budgets[?starts_with(BudgetName, '${PROJECT}-')].BudgetName" \
+    --output text 2>&1)"; then
+  # An account with no budgets answers NotFoundException rather than an empty
+  # list, and that is the clean case here, not a failure.
+  if printf '%s' "$budgets" | grep -qi 'NotFound'; then
+    echo "  none"
+  else
+    printf '  !! could not list budgets: %s\n' "$budgets"
+    found=1
+  fi
+elif [ -n "$budgets" ] && [ "$budgets" != "None" ]; then
+  for b in $budgets; do note "budget $b"; done
+else
+  echo "  none"
+fi
+
+# Health checks are global, so no regional sweep reaches them, and the API gives
+# them no name - only the tag does, and get-resources does not return them.
+#
+# So this lists every health check in the account and lets you read the endpoint.
+# In an account that runs only this project that is exactly right; in a shared
+# one it will name checks that were never ours, which is the safer way round for
+# a script whose whole job is "did something survive".
+echo "Route53 health checks (global, unnamed in the API)"
+if ! checks="$(aws route53 list-health-checks \
+    --query 'HealthChecks[].[Id,HealthCheckConfig.FullyQualifiedDomainName]' \
+    --output text 2>&1)"; then
+  printf '  !! could not list health checks: %s\n' "$checks"
+  found=1
+elif [ -n "$checks" ] && [ "$checks" != "None" ]; then
+  while read -r id fqdn; do
+    [ -n "$id" ] && note "health check $id ($fqdn)"
+  done <<< "$checks"
+else
+  echo "  none"
+fi
+
 echo
 if [ "$found" -eq 0 ]; then
   echo "==> clean - nothing left running"

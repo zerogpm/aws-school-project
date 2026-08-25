@@ -194,7 +194,7 @@ decision forces the next.
 | [`03-data`](03-data/) | Single-table DynamoDB design, API Gateway, Lambda — and one copy of the handler code that also runs locally under Express | Built |
 | [`04-booking`](04-booking/) | Conditional writes, the double-booking demo | Built |
 | [`05-email`](05-email/) | Table stream → Lambda → SES booking confirmations | Built, not yet applied |
-| [`06-cost`](06-cost/) | Budgets alarm, health check, PITR — **and the complete system** | Not started |
+| [`06-cost`](06-cost/) | Two budgets, a Route53 health check → SNS email, PITR — **and the complete system** | Built, not yet applied |
 
 ## Layout
 
@@ -207,6 +207,8 @@ site/                     React SPA (Vite), plus its unit and e2e tests
 backend/                  Lambda handlers, plus the local DynamoDB harness
 scripts/deploy-site.sh    build the front end and publish it
 scripts/create-staff.sh   create a staff account and put it in a group
+scripts/seed-stage.sh     seed a deployed stage's table
+scripts/cost-report.sh    what the account actually cost, by service
 scripts/check-destroyed.sh  confirm a destroy really left nothing behind
 app.sh                    the local stack: --start [--api] [--web], --stop, --status, --scan
 ```
@@ -250,6 +252,17 @@ content is expected, and is evidence that OAC is working.
 Measured figures land here once the full stack has been up long enough to
 produce a real bill. Until then this section stays empty rather than carrying an
 estimate — a wrong number is worse than no number.
+
+`./scripts/cost-report.sh` is what produces them: Cost Explorer grouped by
+service, with a per-day and a projected-monthly line. Run it after the stack has
+been up a couple of days, and paste the table here.
+
+[`06-cost/README.md`](06-cost/README.md) carries a *pre-measurement estimate*,
+clearly labelled as one, because the shape of it is the episode: roughly seventy
+percent of the bill is expected to be the guardrail itself — the Route53 health
+check plus the API Gateway charges for its own prober traffic — rather than the
+site, the table, the CDN and Cognito combined. Confirming or demolishing that
+number is what this section is for.
 
 Two things make measuring this harder than it looks. Cost allocation tags are
 **not retroactive** — `Project` and `Stage` attribute spend only from the moment

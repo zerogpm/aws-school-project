@@ -34,6 +34,7 @@ import type {
 import type { AttributeValue } from "@aws-sdk/client-dynamodb";
 import { docClient, TABLE_NAME } from "../db.js";
 import { FROM_ADDRESS, SITE_BASE_URL, ses } from "../mail.js";
+import { formatSlotTime } from "../booking/format.js";
 import {
   BOOKING_META_SK,
   emailPk,
@@ -142,7 +143,10 @@ async function releaseSend(ref: string, kind: Kind): Promise<void> {
 }
 
 function compose(kind: Kind, booking: Booking): { subject: string; body: string } {
-  const when = booking.startsAt ?? "the scheduled time";
+  // Empty rather than a placeholder phrase, because the sentences below drop
+  // the clause entirely when the record carries no time. "The interview at the
+  // scheduled time" told a parent nothing and read like a bug.
+  const when = booking.startsAt ? formatSlotTime(booking.startsAt) : "";
   const ref = booking.bookingRef ?? "";
   const greeting = booking.parentName ? `Hello ${booking.parentName},` : "Hello,";
 
@@ -152,7 +156,9 @@ function compose(kind: Kind, booking: Booking): { subject: string; body: string 
       body: [
         greeting,
         "",
-        `The interview at ${when} has been cancelled and the time is free again.`,
+        when
+          ? `Your interview on ${when} has been cancelled and the time is free again.`
+          : "Your interview has been cancelled and the time is free again.",
         "",
         `If this was not you, book again at ${SITE_BASE_URL}/interviews`,
       ].join("\n"),
@@ -164,7 +170,7 @@ function compose(kind: Kind, booking: Booking): { subject: string; body: string 
     body: [
       greeting,
       "",
-      `You are booked for ${when}.`,
+      when ? `You are booked for ${when}.` : "Your interview is booked.",
       "",
       // The reference is the only thing that identifies the booking - there are
       // no parent accounts - so it belongs in the message a parent keeps rather

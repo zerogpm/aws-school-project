@@ -10,6 +10,15 @@ export default defineConfig({
     // reads one is supposed to fail loudly when nobody wired it - so the suite
     // has to supply them the same way the local server does.
     env: {
+      // Not a handler variable - the machine's own clock.
+      //
+      // src/booking/format.ts converts a stored instant into the school's
+      // timezone, and the test that proves it does would pass by accident on a
+      // laptop already set to America/Toronto. Pinning the suite to UTC means
+      // deleting that conversion turns "5:40 p.m. EDT" into "9:40 p.m. UTC" on
+      // every machine rather than only on some of them.
+      TZ: "UTC",
+
       TABLE_NAME: "local-school",
       MEDIA_BUCKET: "local-media",
       MEDIA_BASE_URL: "https://cdn.test",

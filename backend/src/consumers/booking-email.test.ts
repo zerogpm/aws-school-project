@@ -121,6 +121,12 @@ describe("the two messages", () => {
     expect(body).toContain("Sarah Okonkwo");
     expect(body).toContain("test-ref");
     expect(body).toContain("https://school.test/interviews");
+
+    // The stored instant, read back as the evening a parent has to turn up.
+    // The raw value must not survive into the message - quoting it is what
+    // this replaced.
+    expect(body).toContain("You are booked for Wednesday, October 14, 2026 at 5:00 p.m. EDT.");
+    expect(body).not.toContain("2026-10-14T21:00:00.000Z");
   });
 
   it("reads a cancellation out of the OLD image, because the item is gone", async () => {
@@ -133,6 +139,12 @@ describe("the two messages", () => {
 
     expect(sesSend).toHaveBeenCalledTimes(1);
     expect(sentInput().Content.Simple.Subject.Data).toMatch(/cancelled/i);
+
+    const body = sentInput().Content.Simple.Body.Text.Data;
+    expect(body).toContain(
+      "Your interview on Wednesday, October 14, 2026 at 5:00 p.m. EDT has been cancelled",
+    );
+    expect(body).not.toContain("2026-10-14T21:00:00.000Z");
   });
 
   it("greets a parent whose name was never captured without saying 'undefined'", async () => {
@@ -146,6 +158,28 @@ describe("the two messages", () => {
     );
 
     expect(sentInput().Content.Simple.Body.Text.Data).not.toMatch(/undefined/);
+  });
+
+  it("drops the time clause rather than printing a placeholder for it", async () => {
+    // startsAt is written by create-booking and is always there in practice.
+    // This is the shape a record takes if that ever stops being true: the
+    // sentence has to stay a sentence, and it must not offer the parent an
+    // "Invalid Date" to plan an evening around.
+    const { startsAt, ...timeless } = BOOKING;
+    void startsAt;
+
+    await handler(
+      streamEvent([
+        { eventName: "INSERT", pk: "BOOKING#test-ref", sk: "META", newImage: timeless },
+      ]),
+    );
+
+    const body = sentInput().Content.Simple.Body.Text.Data;
+    expect(body).toContain("Your interview is booked.");
+    expect(body).not.toMatch(/Invalid Date|undefined/);
+    // The reference still has to be there - it is the only thing that lets a
+    // parent phone the office about the right booking.
+    expect(body).toContain("test-ref");
   });
 });
 

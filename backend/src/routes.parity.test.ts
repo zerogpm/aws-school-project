@@ -61,6 +61,16 @@ const tableStages = stageDirs.filter((stage) =>
 const staffStages = stageDirs.filter((stage) => existsSync(join(repoRoot, stage, "staff.tf")));
 
 /**
+ * Stages that ship the guardrails.
+ *
+ * One today. Discovered rather than named, for the reason MISTAKES.md recorded
+ * twice in a single day: an assertion pinned to the newest stage stops covering
+ * it the moment a newer one arrives, and the copy nobody checks is the one that
+ * drifts.
+ */
+const guardedStages = stageDirs.filter((stage) => existsSync(join(repoRoot, stage, "health.tf")));
+
+/**
  * A .tf file with its comments removed.
  *
  * These assertions are about what the configuration *does*, and the comments in
@@ -77,6 +87,29 @@ const withoutComments = (tf: string): string =>
 const consumersCode = withoutComments(consumersTf);
 
 const staffCodeFor = (stage: string) => withoutComments(read(`../../${stage}/staff.tf`));
+
+const healthCodeFor = (stage: string) => withoutComments(read(`../../${stage}/health.tf`));
+const budgetCodeFor = (stage: string) => withoutComments(read(`../../${stage}/budget.tf`));
+const stageVarsFor = (stage: string) => withoutComments(read(`../../${stage}/variables.tf`));
+
+/**
+ * Runs of spaces collapsed, so an assertion survives `terraform fmt`.
+ *
+ * fmt aligns `=` within a block, so the same argument is `count = ` in one
+ * resource and `count    = ` in the next one that happens to carry a longer
+ * attribute name. Matching raw text makes these tests fail on formatting.
+ */
+const squash = (tf: string): string => tf.replace(/[ 	]+/g, " ");
+
+/**
+ * One resource's body: from its header to the next `resource "`.
+ *
+ * Slicing to end-of-file instead is what made the first draft of the us-east-1
+ * assertion decoration - the alarm's own provider line sat inside the slice
+ * taken for the topic, so deleting the topic's provider kept the test green.
+ */
+const resourceBlock = (tf: string, header: string): string =>
+  (tf.split(header)[1] ?? "").split('resource "')[0];
 
 describe("routes.json", () => {
   it("is current", () => {
@@ -488,5 +521,101 @@ describe("seeding a deployed stage", () => {
     const seedTf = withoutComments(readFileSync(join(repoRoot, stage, "seed.tf"), "utf8"));
     expect(seedTf).toContain("local-exec");
     expect(seedTf).not.toContain("aws_dynamodb_table_item");
+  });
+});
+
+describe("the guardrails", () => {
+  it("are shipped by at least one stage, or the cases below prove nothing", () => {
+    // describe.each over an empty list is zero tests and a green run.
+    expect(guardedStages).not.toHaveLength(0);
+  });
+
+  describe.each(guardedStages)("%s", (stage) => {
+    const healthCode = squash(healthCodeFor(stage));
+    const budgetCode = squash(budgetCodeFor(stage));
+    const varsCode = squash(stageVarsFor(stage));
+
+    it("puts the alarm and its topic in us-east-1", () => {
+      // The quietest failure in the stage, and the reason this block exists.
+      //
+      // Route53 publishes HealthCheckStatus into AWS/Route53 in us-east-1 and
+      // nowhere else. This alarm created in ca-central-1 finds no metric, sits
+      // in INSUFFICIENT_DATA forever and never fires - no error at validate, at
+      // plan or at apply, and nothing in any log. Nothing looks wrong; it is
+      // simply not watching. A CloudWatch alarm can also only publish to a
+      // topic in its own region, so the topic has to follow the alarm.
+      const alarm = resourceBlock(healthCode, 'resource "aws_cloudwatch_metric_alarm"');
+      const topic = resourceBlock(healthCode, 'resource "aws_sns_topic" "alerts"');
+
+      expect(alarm).toContain("provider = aws.us_east_1");
+      expect(topic).toContain("provider = aws.us_east_1");
+    });
+
+    it("pins the health checker regions", () => {
+      // Unpinned, Route53 probes from every location it has - AWS documents the
+      // endpoint taking a request "about every two seconds", roughly 1.3 million
+      // a month against a system built for near-dead traffic, instead of 260
+      // thousand. Deleting the argument breaks nothing and raises the bill.
+      expect(healthCode).toContain("regions = var.health_check_regions");
+    });
+
+    it("asks for at least the three checker regions the API requires", () => {
+      const block = varsCode.split('variable "health_check_regions"')[1] ?? "";
+      const defaults = block.split("default")[1]?.split("]")[0] ?? "";
+
+      expect(defaults.split(",").filter((region) => region.includes("-")).length)
+        .toBeGreaterThanOrEqual(3);
+    });
+
+    it("strips the trailing slash off the API url before using it as a hostname", () => {
+      // A $default stage's invoke_url ends in a slash. "host/" is not a
+      // hostname: Route53 accepts it, every checker fails to resolve it, and the
+      // alarm reports the API permanently down - a guardrail that cries wolf
+      // from the moment it is created is worse than no guardrail. The front end
+      // strips the same slash for the same reason.
+      const check = resourceBlock(healthCode, 'resource "aws_route53_health_check"');
+
+      expect(check).toContain("trimsuffix(");
+    });
+
+    it("declines the chargeable optional features it said it would", () => {
+      // Both are named as cuts in the README. A cut that quietly un-cuts itself
+      // is worse than never having made it.
+      expect(healthCode).not.toContain("search_string");
+      expect(healthCode).not.toContain("measure_latency = true");
+    });
+
+    it("ships both budgets", () => {
+      // The daily one is the runaway tripwire, and the easiest thing here to
+      // lose in a refactor: nothing else in the repo references it, and the
+      // monthly budget goes on looking like complete cost coverage without it.
+      expect(budgetCode).toContain('time_unit = "MONTHLY"');
+      expect(budgetCode).toContain('time_unit = "DAILY"');
+    });
+
+    it("budgets the target rather than the cap", () => {
+      // CLAUDE.md caps the system at $20/month and targets $10. Budgeting the
+      // cap puts the first warning at $10 and the last one after the month is
+      // already lost.
+      const block = varsCode.split('variable "monthly_budget_usd"')[1]?.split("validation")[0] ?? "";
+      const configured = Number.parseInt(block.split("default")[1]?.split("=")[1]?.trim() ?? "", 10);
+
+      expect(configured).toBeGreaterThan(0);
+      expect(configured).toBeLessThanOrEqual(20);
+    });
+
+    it("creates nothing unless an address is configured", () => {
+      // Same shape as staff.tf. Half-wired is worse than absent here: a topic
+      // with no subscriber looks like monitoring and reaches nobody.
+      // Every resource, not merely one of them. toContain over a whole file only
+      // proves that *something* is gated, and a half-applied guardrail - a topic
+      // with no alarm behind it, a health check nothing watches - is the failure
+      // worth catching. This assertion was decoration until it counted.
+      const gated = (tf: string) => tf.split('count = var.alert_email != "" ? 1 : 0').length - 1;
+      const resources = (tf: string) => tf.split('resource "').length - 1;
+
+      expect(gated(healthCode)).toBe(resources(healthCode));
+      expect(gated(budgetCode)).toBe(resources(budgetCode));
+    });
   });
 });

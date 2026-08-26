@@ -33,6 +33,22 @@ reporting completion. Show actual test output as proof — never "this should wo
    maintainer's job alone. The commit log is part of the series narrative — each
    commit marks an episode beat — so it is authored deliberately, not generated
    as a side effect of a change. Read-only git (`status`, `diff`, `log`) is fine.
+7. NEVER write a claim that the system holds a kind of data without first finding
+   the thing that produces it. Before a README, run sheet, diagram or narration
+   line says the build stores something, go look for the writer — a handler, an
+   uploader, a seeded object. No writer means the layout is **provisioned, not
+   populated**, and it has to be said that way. `docs/` is the only prefix with a
+   producer: the staff PDF upload, pinned in `backend/src/media.ts` and gated on
+   a `%PDF-` byte check. `photos/` and `video/` have real lifecycle rules and a
+   CloudFront behaviour each, and nothing in the repo ever writes to them.
+
+   When you find a claim like that, don't just delete it. Rewrite it so the
+   provisioned layout reads as a layout decision — that version is stronger, not
+   weaker, because a prefix layout is the one thing that cannot be changed once
+   the objects exist — and add the unbuilt feature to the cuts, where it belongs.
+   Then bring the rewrite to me instead of applying it silently. This is a
+   portfolio repo and the narration is filmed; a claim about data that isn't
+   there is the one error the camera makes permanent.
 
 ## General Behaviour
 
@@ -159,7 +175,9 @@ when you are working in `backend/`. None of them touch AWS or cost anything.
 
 Deliberately out of scope: CI/CD, dashboards, paging alarms, multi-region, RDS,
 containers, Kubernetes, VPC, the interview waitlist, parent accounts, payments,
-grades. Each cut is stated on camera with its reason — the cuts are the content.
+grades, and the photo/video gallery — `photos/` and `video/` are a provisioned
+prefix layout, never a built feature. Each cut is stated on camera with its
+reason — the cuts are the content.
 
 ## Key Files
 

@@ -32,7 +32,7 @@ resource "terraform_data" "demo_staff" {
 
   provisioner "local-exec" {
     interpreter = [local.bash_bin, "-c"]
-    command     = "${path.module}/../scripts/create-staff.sh '${var.demo_staff_email}' office"
+    command     = "'${local.bash_bin}' '${path.module}/../scripts/create-staff.sh' '${var.demo_staff_email}' office"
 
     environment = {
       # Passed in rather than looked up. A provisioner running inside an apply

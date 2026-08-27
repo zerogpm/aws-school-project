@@ -1,0 +1,7 @@
+# Line endings.
+#
+# The shell scripts are run by bash on macOS and Linux, and by Git Bash on
+# Windows. A CRLF checkout breaks them in ways that are hard to read: the
+# shebang becomes "/bin/bash\r" and every quoted string carries a trailing CR.
+# Pin them to LF so the same checkout works on either OS.
+*.sh text eol=lf

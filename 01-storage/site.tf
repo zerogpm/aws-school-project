@@ -27,6 +27,11 @@ locals {
   git_bash = "C:/Program Files/Git/bin/bash.exe"
   bash_bin = fileexists(local.git_bash) ? local.git_bash : "bash"
 
+  # The script is handed to bash as an argument rather than run directly. A
+  # checkout made on Windows has no exec bit on scripts/*.sh - Git for Windows
+  # cannot record one - so executing it on macOS or Linux fails with exit 126,
+  # after every other resource in the stage has already been created.
+
   site_dir = "${path.module}/../site"
 
   # Any change under src/, or to the build inputs, means a rebuild and reupload.
@@ -50,7 +55,7 @@ resource "terraform_data" "site_content" {
 
   provisioner "local-exec" {
     interpreter = [local.bash_bin, "-c"]
-    command     = "${path.module}/../scripts/deploy-site.sh"
+    command     = "'${local.bash_bin}' '${path.module}/../scripts/deploy-site.sh'"
 
     environment = {
       SITE_BUCKET     = module.static_site.site_bucket_name
